@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docaudit"
-version = "0.0.6"
+version = "0.1.0"
 description = "Verificator local de documentație exportată din OneNote"
 requires-python = ">=3.11"
 dependencies = []
@@ -13,6 +13,7 @@ dependencies = []
 dev = ["pytest>=8"]
 semantic = ["sentence-transformers>=2.2"]
 windows = ["pywin32>=306; sys_platform == 'win32'"]
+tray = ["pystray>=0.19", "Pillow>=10"]
 
 [project.scripts]
 docaudit = "docaudit.__main__:main"
@@ -21,7 +22,7 @@ docaudit = "docaudit.__main__:main"
 include = ["docaudit*"]
 
 [tool.setuptools.package-data]
-docaudit = ["locales/*.json"]
+docaudit = ["locales/*.json", "ui/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

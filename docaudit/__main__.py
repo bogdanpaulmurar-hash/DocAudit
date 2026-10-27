@@ -15,41 +15,28 @@
     python -m docaudit group-detach DIR PAGINA
     python -m docaudit compare DIR                 (după „group”; scrie findings.json)
     python -m docaudit compare-eval DIR [--expected FILE]
+    python -m docaudit                             (fără comandă: iconiță în tray + interfața în browser)
+    python -m docaudit ui [--port N] [--no-browser]
+    python -m docaudit report DIR [--format html|csv|md] [--out FILE]
+    python -m docaudit apply DIR [--yes]          (previzualizare; --yes scrie în OneNote, dacă e permis)
+    python -m docaudit restore DIR NUMĂR
+    python -m docaudit make-icon FOLDER
     python -m docaudit download-model              (o singură dată, singura comandă cu internet)
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 from . import __version__
 from .i18n import t
 from .model import SCHEMA_VERSION, read_pages, validate_dataset
+from .paths import data_dir, resolve_folder
 from .sample import DEFAULT_SEED, write_sample
 
 DEFAULT_SAMPLE_DIR = Path("tests/fixtures/sample_v1")
-
-
-def data_dir() -> Path:
-    """Unde stau datele extrase. Implicit pe disc local, NU în folderul sincronizat al repo-ului.
-
-    Documentația companiei nu are voie să ajungă în Google Drive prin clona din G:\\My Drive.
-    """
-    if os.environ.get("DOCAUDIT_DATA"):
-        return Path(os.environ["DOCAUDIT_DATA"])
-    if os.environ.get("LOCALAPPDATA"):
-        return Path(os.environ["LOCALAPPDATA"]) / "DocAudit" / "data"
-    return Path.home() / ".local" / "share" / "docaudit"
-
-
-def resolve_folder(arg: Path) -> Path:
-    """Acceptă o cale sau doar numele unei extrageri din folderul de date (ex. „demo”)."""
-    if arg.exists() or arg.is_absolute() or len(arg.parts) > 1:
-        return arg
-    return data_dir() / arg
 
 
 def _add_selection_args(p: argparse.ArgumentParser) -> None:
@@ -79,6 +66,17 @@ def _source(demo: bool):
 
 
 def main(argv: list[str] | None = None) -> int:
+    if sys.stdout is None:  # pythonw: fără consolă
+        import io
+        import os
+
+        sys.stdout = sys.stderr = io.TextIOWrapper(open(os.devnull, "wb"), encoding="utf-8")  # noqa: SIM115
+    if argv is None:
+        argv = sys.argv[1:]
+    if not argv:
+        from .tray import run_app
+
+        return run_app()
     parser = argparse.ArgumentParser(prog="docaudit", description=t("cli.description"))
     parser.add_argument("--version", action="version", version=t("cli.version", version=__version__))
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -139,6 +137,26 @@ def main(argv: list[str] | None = None) -> int:
     p_cev.add_argument("folder", type=Path)
     p_cev.add_argument("--expected", type=Path, default=None)
 
+    p_ui = sub.add_parser("ui", help=t("cli.ui.help"))
+    p_ui.add_argument("--port", type=int, default=None, help=t("cli.ui.port"))
+    p_ui.add_argument("--no-browser", action="store_true", help=t("cli.ui.nobrowser"))
+
+    p_rep = sub.add_parser("report", help=t("cli.report.help"))
+    p_rep.add_argument("folder", type=Path)
+    p_rep.add_argument("--format", choices=["html", "csv", "md"], default="html")
+    p_rep.add_argument("--out", type=Path, default=None)
+
+    p_app = sub.add_parser("apply", help=t("cli.apply.help"))
+    p_app.add_argument("folder", type=Path)
+    p_app.add_argument("--yes", action="store_true", help=t("cli.apply.yes"))
+
+    p_res = sub.add_parser("restore", help=t("cli.restore.help"))
+    p_res.add_argument("folder", type=Path)
+    p_res.add_argument("number", type=int)
+
+    p_icon = sub.add_parser("make-icon", help=t("cli.icon.help"))
+    p_icon.add_argument("folder", type=Path)
+
     sub.add_parser("download-model", help=t("cli.model.help"))
 
     p_imp = sub.add_parser("import-files", help=t("cli.import.help"))
@@ -194,6 +212,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd in ("compare", "compare-eval"):
         return _compare_commands(args)
+
+    if args.cmd in ("ui", "report", "apply", "restore", "make-icon"):
+        return _app_commands(args)
 
     if args.cmd == "download-model":
         from .group.semantic import SemanticUnavailable, download_model
@@ -363,6 +384,71 @@ def _finding_line(f, names) -> str:
         else:
             reasons.append(t(f"cli.compare.reason.{r['reason']}", value=r["value"], other=r.get("other", "")))
     return t("cli.compare.stale", page=names(f.pages), reasons="; ".join(reasons))
+
+
+def _app_commands(args: argparse.Namespace) -> int:
+    from .settings import load_settings
+
+    settings = load_settings()
+    if args.cmd == "make-icon":
+        from .icon import write_icons
+
+        print(t("cli.icon.done", path=write_icons(args.folder)))
+        return 0
+    if args.cmd == "ui":  # pragma: no cover - pornire interactivă
+        import webbrowser
+
+        from .ui.server import make_server
+
+        server = make_server(args.port or settings.port)
+        print(t("cli.ui.started", url=server.url))
+        if not args.no_browser:
+            webbrowser.open(server.url)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+        return 0
+
+    folder = resolve_folder(args.folder)
+    if args.cmd == "report":
+        from .report import build_state, render
+
+        out = args.out or folder / f"raport.{args.format}"
+        out.write_text(render(build_state(folder), args.format), encoding="utf-8", newline="\n")
+        print(t("cli.report.done", path=out))
+        return 0
+
+    from .apply.run import WriteDisabled, apply, plan, restore, writer_for
+    from .extract.com import OneNoteError
+
+    try:
+        writer = writer_for(folder)
+        if args.cmd == "restore":
+            print(t("cli.restore.done", section=restore(folder, writer, settings, args.number)["section"]))
+            return 0
+        items = plan(folder, writer, settings)
+        if not items:
+            print(t("cli.apply.none"))
+            return 0
+        for it in items:
+            extra = t(f"ui.apply.reason.{it.reason}") if it.reason else ""
+            print(t("cli.apply.row", status=t("ui.apply.ready") if it.status == "ready" else "—", id=it.decision_id,
+                    action=t(f"ui.action.{it.action}"), title=it.title, where=f"{it.notebook} › {it.section}",
+                    extra=extra))
+        if not args.yes:
+            print(t("cli.apply.preview"))
+            return 0
+        r = apply(folder, writer, settings, [it.decision_id for it in items if it.status == "ready"])
+        for e in r.errors:
+            print(f"  ⚠ {e['title']}: {e['error']}")
+        print(t("cli.apply.result", done=len(r.done), skipped=len(r.skipped), errors=len(r.errors)))
+        return 1 if r.errors else 0
+    except (WriteDisabled, OneNoteError, ValueError) as e:
+        print(e)
+        return 2
 
 
 if __name__ == "__main__":

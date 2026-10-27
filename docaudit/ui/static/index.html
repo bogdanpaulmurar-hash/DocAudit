@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="docaudit-token" content="__TOKEN__">
+<title>DocAudit</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="/icon.svg" alt="" width="22" height="22"><span>DocAudit</span></div>
+  <nav id="tabs" aria-label="DocAudit"></nav>
+  <div class="tools">
+    <label class="ds"><span data-t="ui.dataset"></span> <select id="dataset"></select></label>
+    <select id="lang" aria-label="Language"></select>
+    <button id="theme" class="ghost" type="button" aria-label="Theme">🌓</button>
+  </div>
+</header>
+<div id="banner" class="banner" hidden></div>
+<main id="view"></main>
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

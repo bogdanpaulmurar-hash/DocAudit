@@ -1,5 +1,17 @@
 # CHANGELOG — DocAudit
 
+## 0.1.0 — 2026-10-27
+- Etapa 6: interfață în browser, doar pe 127.0.0.1, cu șase ecrane: Sursă (bife pe notebook / secțiune / pagină), Analiză (prag cu tabel pe praguri), Grupuri (constatări + paginile una lângă alta, valorile diferite evidențiate, taste J/K, 1–9, R/O/A/I), De aplicat, Arhivă și jurnal, Setări. RO / EN / DE, temă luminoasă și întunecată.
+- Serverul folosește doar biblioteca standard Python, nu FastAPI, ca instalarea să nu depindă de pachete pe care IT-ul le-ar putea bloca. Protecții: verificarea Host, un jeton pe fiecare cerere /api/, CSP strict și niciun CORS. Textul paginilor intră în pagină doar ca text.
+- Jurnalul deciziilor în `decisions.db` (SQLite local, lângă date): Referință, Învechită, Arhivează, Lasă așa, Ignoră constatarea, Nu e în grup (scrie și corectura de grupare), Notă. Fiecare decizie se poate anula până la aplicare.
+- Raport HTML, CSV (cu `;` și BOM, pentru Excel) și Markdown, din interfață sau cu `report`.
+- Etapa 7: „Aplică”, cu previzualizare exactă, doar pentru deciziile bifate și doar cu „Permite scrierea în OneNote” pornit în setări (oprit implicit). Înainte de fiecare pagină se salvează XML-ul ei în `_backups`. Arhivarea = copie în secțiunea „Arhivă” a aceluiași notebook, cu nota „Mutat din: <secțiune>, <dată>, motiv: <motiv>”; originalul ajunge în Coșul OneNote. „Învechită” = prefixul „[ÎNVECHIT] ” în titlu. O pagină modificată în OneNote după extragere se sare. „Restaurează” întoarce pagina în secțiunea ei sau scoate prefixul.
+- Pe eșantion, scrierea merge într-un OneNote fals (`demo_onenote.json`), ca fluxul complet să se poată încerca fără OneNote.
+- Etapa 8: `pythonw -m docaudit` pornește iconița din tray (Deschide / Închide) și browserul; o a doua pornire doar deschide browserul. Iconița e desenată din cod (.png / .ico), fără fișiere binare în repo. `Install.bat` creează scurtăturile DocAudit pe Desktop și în meniul Start. Setări în `settings.json`. Descriere pentru DevPilot în `devpilot.tool.json`.
+- Comenzi noi: `ui`, `report`, `apply` (previzualizare; `--yes` aplică), `restore`, `make-icon`; fără comandă pornește aplicația.
+- Teste: 108 trecute (`pytest -q`, Linux, Python 3.13), inclusiv serverul (Host, jeton, Origin, căi) și arhivare + marcare + restaurare pe OneNote-ul fals.
+- Livrare: `git pull`, apoi **din nou `Install.bat`** (adaugă pystray / Pillow și scurtăturile).
+
 ## 0.0.6 — 2026-10-27
 - Etapa 5: compararea paginilor din fiecare grup, local și doar citire. Comanda `compare` scrie `findings.json` lângă date și nu modifică paginile, grupurile sau OneNote.
 - Pașii se aliniază între pagini chiar dacă sunt reformulați: valorile (cifre, căi, adrese, coduri ca GRP-Users, opțiuni de comandă) sunt înlocuite cu un semn comun înainte de comparare.

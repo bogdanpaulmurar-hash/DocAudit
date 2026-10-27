@@ -161,4 +161,6 @@ Pe Windows, același eșantion se importă într-un **notebook OneNote de test**
 | 7 | Aplică: arhivare/marcare cu dry-run, backup, restaurare | test cap-coadă pe notebook de test |
 | 8 | Tray, setări, i18n, integrare DevPilot (`devpilot.tool.json`) | pornire cu `pythonw` |
 
-**Stack propus**: Python 3.12, `pywin32`, FastAPI + Uvicorn, HTMX + CSS simplu (fără build JS), SQLite, `scikit-learn`, `rapidfuzz`, `datasketch`, `pystray`; opționale: `sentence-transformers`, `pytesseract`, Ollama.
+**Stack folosit (0.1.0)**: Python standard library pentru server (`http.server`), SQLite, TF-IDF propriu și HTML/CSS/JS fără build, ca instalarea să nu depindă de pachete externe. Opționale: `pywin32` (COM), `pystray` + `Pillow` (tray), `sentence-transformers` (sens).
+
+**Stack propus inițial**: Python 3.12, `pywin32`, FastAPI + Uvicorn, HTMX + CSS simplu (fără build JS), SQLite, `scikit-learn`, `rapidfuzz`, `datasketch`, `pystray`; opționale: `sentence-transformers`, `pytesseract`, Ollama.

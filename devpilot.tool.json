@@ -1,0 +1,15 @@
+{
+  "name": "DocAudit",
+  "description": "Verificator local de documentație OneNote: grupează paginile despre aceeași procedură, arată conflictele și paginile învechite; tu decizi ce se arhivează.",
+  "version": "0.1.0",
+  "launch": {
+    "windows": "%LOCALAPPDATA%\\DocAudit\\venv\\Scripts\\pythonw.exe -m docaudit",
+    "cli": "%LOCALAPPDATA%\\DocAudit\\venv\\Scripts\\python.exe -m docaudit"
+  },
+  "install": "Install.bat",
+  "url": "http://127.0.0.1:8765/",
+  "icon": "%LOCALAPPDATA%\\DocAudit\\docaudit.ico",
+  "data": "%LOCALAPPDATA%\\DocAudit\\data",
+  "network": "none",
+  "languages": ["ro", "en", "de"]
+}
