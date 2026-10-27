@@ -27,7 +27,7 @@ OneNote (desktop)          DocAudit (local, 127.0.0.1)
 
 ### Pas 2 — Metadate și normalizare
 Pentru fiecare pagină:
-- curățare text (spații, bullet-uri, tabele → rânduri), limbă detectată (ro/en);
+- curățare text (spații, bullet-uri, tabele → rânduri), limbă detectată (ro/en/de: documentația e amestecată);
 - **pași de procedură**: listele numerotate și liniile imperative devin o listă ordonată de pași;
 - **entități „valori”**: versiuni (`v2.3`, `build 1045`), căi (`C:\…`, `\\server\…`), URL-uri, comenzi, porturi, IP-uri, nume de aplicații, date menționate în text. Acestea sunt ce se compară la conflicte;
 - imagini: hash exact (SHA-256) + hash perceptual (aceeași captură, redimensionată); OCR local cu Tesseract — **opțional**, oprit implicit;

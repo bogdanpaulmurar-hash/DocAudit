@@ -13,10 +13,16 @@ from collections import Counter
 
 _NON_ALNUM = re.compile(r"[^0-9a-z]+")
 
-# cuvinte din titluri care nu spun nimic despre procedură (se pot schimba din setări)
+# cuvinte din titluri care nu spun nimic despre procedură (RO, EN, DE; se pot schimba din setări)
 DEFAULT_TITLE_NOISE = (
+    # română
     "ghid", "actualizat", "nou", "noua", "vechi", "veche", "copie", "pe pasi", "pasi",
-    "procedura", "draft", "final", "v2", "update", "updated", "copy", "new", "old",
+    "procedura", "draft", "final", "v2",
+    # engleză
+    "guide", "how to", "steps", "step by step", "update", "updated", "copy", "new", "old",
+    # germană (fără diacritice, după normalizare: ü→u, ß→ss)
+    "anleitung", "schritt fur schritt", "schritte", "neu", "alt", "kopie", "aktualisiert",
+    "entwurf", "veraltet",
 )
 
 Vector = dict[str, float]

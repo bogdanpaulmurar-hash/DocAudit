@@ -44,5 +44,8 @@
   "cli.groupmerge.help": "Always put two pages in the same group",
   "cli.groupdetach.help": "Take a page out of its group",
   "cli.groupdetach.notfound": "Page {page} is not in any group",
-  "cli.groupoverride.saved": "Correction saved; run “group” again."
+  "cli.groupoverride.saved": "Correction saved; run “group” again.",
+  "cli.model.help": "Download the meaning-similarity model once (the only command that uses the internet)",
+  "cli.model.done": "Model ready: {model}. From now on it runs offline.",
+  "cli.model.missing": "sentence-transformers is missing: run Install.bat semantic"
 }

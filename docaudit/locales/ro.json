@@ -44,5 +44,8 @@
   "cli.groupmerge.help": "Pune mereu două pagini în același grup",
   "cli.groupdetach.help": "Scoate o pagină din grupul ei",
   "cli.groupdetach.notfound": "Pagina {page} nu e în niciun grup",
-  "cli.groupoverride.saved": "Corectura a fost salvată; rulează din nou „group”."
+  "cli.groupoverride.saved": "Corectura a fost salvată; rulează din nou „group”.",
+  "cli.model.help": "Descarcă o singură dată modelul pentru asemănarea după sens (singura comandă cu internet)",
+  "cli.model.done": "Model pregătit: {model}. De acum rulează offline.",
+  "cli.model.missing": "sentence-transformers lipsește: rulează Install.bat semantic"
 }

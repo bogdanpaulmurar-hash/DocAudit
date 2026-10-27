@@ -13,6 +13,7 @@
     python -m docaudit group-eval DIR [--expected FILE]
     python -m docaudit group-merge DIR PAGINA_A PAGINA_B
     python -m docaudit group-detach DIR PAGINA
+    python -m docaudit download-model              (o singură dată, singura comandă cu internet)
 """
 
 from __future__ import annotations
@@ -31,7 +32,22 @@ DEFAULT_SAMPLE_DIR = Path("tests/fixtures/sample_v1")
 
 
 def data_dir() -> Path:
-    return Path(os.environ.get("DOCAUDIT_DATA", "data"))
+    """Unde stau datele extrase. Implicit pe disc local, NU în folderul sincronizat al repo-ului.
+
+    Documentația companiei nu are voie să ajungă în Google Drive prin clona din G:\\My Drive.
+    """
+    if os.environ.get("DOCAUDIT_DATA"):
+        return Path(os.environ["DOCAUDIT_DATA"])
+    if os.environ.get("LOCALAPPDATA"):
+        return Path(os.environ["LOCALAPPDATA"]) / "DocAudit" / "data"
+    return Path.home() / ".local" / "share" / "docaudit"
+
+
+def resolve_folder(arg: Path) -> Path:
+    """Acceptă o cale sau doar numele unei extrageri din folderul de date (ex. „demo”)."""
+    if arg.exists() or arg.is_absolute() or len(arg.parts) > 1:
+        return arg
+    return data_dir() / arg
 
 
 def _add_selection_args(p: argparse.ArgumentParser) -> None:
@@ -114,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
     p_gd.add_argument("folder", type=Path)
     p_gd.add_argument("page")
 
+    sub.add_parser("download-model", help=t("cli.model.help"))
+
     p_imp = sub.add_parser("import-files", help=t("cli.import.help"))
     p_imp.add_argument("folder", type=Path)
     p_imp.add_argument("--out", type=Path, help=t("cli.extract.out"))
@@ -126,6 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "validate":
+        args.folder = resolve_folder(args.folder)
         errors = validate_dataset(args.folder)
         if errors:
             print(t("cli.validate.errors", count=len(errors)))
@@ -155,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "check-sample":
         from .extract.check import compare_to_sample
 
-        problems = compare_to_sample(args.folder)
+        problems = compare_to_sample(resolve_folder(args.folder))
         for pr in problems:
             print(f"  - {pr}")
         print(t("cli.check.result", count=len(problems)))
@@ -164,10 +183,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd in ("group", "group-eval", "group-merge", "group-detach"):
         return _group_commands(args)
 
+    if args.cmd == "download-model":
+        from .group.semantic import SemanticUnavailable, download_model
+
+        try:
+            print(t("cli.model.done", model=download_model()))
+        except SemanticUnavailable:
+            print(t("cli.model.missing"))
+            return 2
+        return 0
+
     if args.cmd == "import-files":
         from .extract.files import import_files
 
-        out = args.out or data_dir() / "import"
+        out = resolve_folder(args.out) if args.out else data_dir() / "import"
         report = import_files(args.folder, out)
         for e in report.errors:
             print(t("cli.extract.error", error=e))
@@ -195,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from .extract.run import extract_to_dataset
 
-    out = args.out or data_dir() / (args.profile or ("demo" if args.demo else "onenote"))
+    out = resolve_folder(args.out) if args.out else data_dir() / (args.profile or ("demo" if args.demo else "onenote"))
     report = extract_to_dataset(
         source, _selection(args), out, incremental=not args.full, source_label=label,
         progress=lambda n, total, title: print(t("cli.extract.progress", n=n, total=total, title=title)),
@@ -214,7 +243,7 @@ def _group_commands(args: argparse.Namespace) -> int:
     from .group.run import DEFAULT_THRESHOLD, load_groups, run_grouping, scan_thresholds
     from .group.semantic import SemanticUnavailable
 
-    folder = args.folder
+    folder = resolve_folder(args.folder)
     if args.cmd == "group":
         try:
             if args.scan:

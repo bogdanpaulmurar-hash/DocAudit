@@ -1,4 +1,4 @@
-"""Texte vizibile utilizatorului, în română și engleză.
+"""Texte vizibile utilizatorului, în română, engleză și germană.
 
 Limba vine din variabila DOCAUDIT_LANG (ro implicit). Cheile lipsă cad pe română,
 apoi pe cheia însăși, ca o traducere lipsă să nu oprească aplicația.
@@ -11,7 +11,7 @@ import os
 from functools import lru_cache
 from importlib import resources
 
-LANGUAGES = ("ro", "en")
+LANGUAGES = ("ro", "en", "de")
 DEFAULT_LANG = "ro"
 
 

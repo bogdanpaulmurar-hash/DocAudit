@@ -2,8 +2,8 @@
 
 Eșantionul are cazuri plantate cu răspunsul corect cunoscut (expected.json):
 grupuri de pagini despre aceeași procedură, conflicte de valori, pași lipsă sau
-inversați, pagini învechite, duplicate, traduceri RO→EN, pagini-capcană cu titluri
-asemănătoare și pagini unice. Rezultatul e determinist pentru același seed.
+inversați, pagini învechite, duplicate, traduceri RO→EN și RO→DE, pagini-capcană cu titluri
+asemănătoare și pagini unice (unele în germană). Rezultatul e determinist pentru același seed.
 
 Toate numele, adresele și valorile sunt inventate (domeniul example.test).
 """
@@ -62,6 +62,8 @@ def _reword(step: str, rng: random.Random) -> str:
     return step
 
 
+TRANSLATION_INTRO = {"en": "Step-by-step guide.", "de": "Schritt-für-Schritt-Anleitung."}
+
 INTROS = [
     "Procedura de mai jos se aplică tuturor angajaților.",
     "Pași verificați de echipa IT.",
@@ -80,7 +82,7 @@ class Procedure:
     slots: dict[str, str]
     conflict: tuple[str, str] | None = None  # (slot, valoare diferită)
     old: dict[str, str] = field(default_factory=dict)  # valorile din varianta învechită
-    en: tuple[str, list[str]] | None = None  # (titlu, pași) pentru traducere
+    translation: tuple[str, str, list[str]] | None = None  # (limbă, titlu, pași)
 
 
 PROCEDURES: list[Procedure] = [
@@ -159,7 +161,7 @@ PROCEDURES: list[Procedure] = [
         {"keylen": "2048", "host": "web01.example.test",
          "cmd": "openssl x509 -noout -enddate -in server.crt"},
         conflict=("keylen", "4096"), old={"cmd": "certutil -dump server.crt"},
-        en=("Renew the SSL certificate for the web server", [
+        translation=("en", "Renew the SSL certificate for the web server", [
             "Generate the CSR with a {keylen}-bit key.",
             "Send the CSR to the internal authority via pki.example.test.",
             "Download the certificate and the intermediate chain.",
@@ -178,7 +180,7 @@ PROCEDURES: list[Procedure] = [
         ],
         {"host": "mail.example.test", "pin": "6"},
         conflict=("pin", "4"), old={"host": "mail-old.example.test"},
-        en=("Set up e-mail on your phone", [
+        translation=("en", "Set up e-mail on your phone", [
             "Install the e-mail app from the company store.",
             "Enter your address in the format name@example.test.",
             "For the server, enter {host}.",
@@ -197,12 +199,12 @@ PROCEDURES: list[Procedure] = [
         ],
         {"notice": "5"},
         conflict=("notice", "10"),
-        en=("Request annual leave", [
-            "Open the HR app at hr.example.test.",
-            "Choose “New request” > “Annual leave”.",
-            "Fill in the period at least {notice} working days in advance.",
-            "Send the request to your direct manager.",
-            "After approval, set the automatic reply in your e-mail.",
+        translation=("de", "Urlaubsantrag stellen", [
+            "Öffne die HR-App unter hr.example.test.",
+            "Wähle „Neuer Antrag“ > „Erholungsurlaub“.",
+            "Trage den Zeitraum mindestens {notice} Arbeitstage im Voraus ein.",
+            "Sende den Antrag an deine direkte Führungskraft.",
+            "Richte nach der Genehmigung die automatische Antwort im E-Mail-Programm ein.",
         ]),
     ),
     Procedure(
@@ -298,7 +300,7 @@ STEP_DIFF = {  # grup -> (varianta, tip)
     12: (1, "missing_step"), 13: (1, "reordered"), 14: (1, "missing_step"),
 }
 DUPLICATE_OF = [0, 1, 2, 3, 4]  # copie aproape identică a paginii de bază
-TRANSLATED = [5, 6, 7]  # traducere EN a paginii de bază
+TRANSLATED = [5, 6, 7]  # traducere a paginii de bază (EN sau DE, vezi Procedure.translation)
 
 # Pagini-capcană: titlu sau vocabular apropiat de o procedură, dar altă procedură.
 DISTRACTORS: list[tuple[str, str, str, list[str]]] = [
@@ -397,10 +399,10 @@ UNIQUE: list[tuple[str, str, str, list[str]]] = [
         "Etajele 1 și 2 se curăță dimineața, etajul 3 după-amiaza.",
         "Lasă birourile libere de hârtii vineri seara.",
     ]),
-    ("Recomandări de ergonomie la birou", "Operațiuni", "Resurse umane", [
-        "Marginea de sus a monitorului la nivelul ochilor.",
-        "O pauză scurtă la fiecare oră.",
-        "Scaunul reglat astfel încât picioarele să stea pe podea.",
+    ("Ergonomie am Arbeitsplatz", "Operațiuni", "Resurse umane", [
+        "Die Oberkante des Monitors liegt auf Augenhöhe.",
+        "Jede Stunde eine kurze Pause.",
+        "Der Stuhl ist so eingestellt, dass die Füße flach auf dem Boden stehen.",
     ]),
     ("Ghid de stil pentru prezentări", "Suport Clienți", "Diverse", [
         "Folosește șablonul cu fundal alb și logo-ul în colțul din dreapta jos.",
@@ -414,10 +416,10 @@ UNIQUE: list[tuple[str, str, str, list[str]]] = [
         "Cardul se încarcă în prima zi lucrătoare a lunii.",
         "Pierderea cardului se anunță la HR.",
     ]),
-    ("Calendar instruiri în trimestrul 1", "Operațiuni", "Note", [
-        "Ianuarie: securitatea informației.",
-        "Februarie: comunicare cu clienții.",
-        "Martie: prim ajutor.",
+    ("Schulungskalender für das erste Quartal", "Operațiuni", "Note", [
+        "Januar: Informationssicherheit.",
+        "Februar: Kommunikation mit Kunden.",
+        "März: Erste Hilfe.",
     ]),
     ("Lucrul de acasă: rezumatul regulilor", "Operațiuni", "Resurse umane", [
         "Maximum două zile pe săptămână, stabilite cu managerul.",
@@ -568,14 +570,14 @@ def build_sample(seed: int = DEFAULT_SEED) -> tuple[Manifest, list[Page], dict[s
     for gi in TRANSLATED:
         proc = PROCEDURES[gi]
         b = bases[proc.key]
-        assert proc.en is not None
-        title_en, steps_en = proc.en
+        assert proc.translation is not None
+        lang, title_tr, steps_tr = proc.translation
         modified = _date(rng, "2025-01-10", "2026-09-30")
         drafts.append(_Draft(
-            role="translation", title=title_en, notebook="Suport Clienți", section="Ghiduri",
-            intro="Step-by-step guide.", steps=_fmt(steps_en, b.values), note="",
+            role="translation", title=title_tr, notebook="Suport Clienți", section="Ghiduri",
+            intro=TRANSLATION_INTRO[lang], steps=_fmt(steps_tr, b.values), note="",
             created=_created_before(rng, modified), modified=modified,
-            group=proc.key, values=dict(b.values), key=f"{proc.key}#en",
+            group=proc.key, values=dict(b.values), key=f"{proc.key}#{lang}",
         ))
 
     for i, (title, nb, sec, steps) in enumerate(DISTRACTORS):

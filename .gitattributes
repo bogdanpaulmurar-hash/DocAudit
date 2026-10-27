@@ -1,2 +1,4 @@
 # Fixture-urile se compară byte cu byte: fără conversie CRLF pe Windows
 tests/fixtures/** -text
+# cmd.exe cere CRLF în fișierele .bat
+*.bat text eol=crlf

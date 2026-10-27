@@ -42,3 +42,15 @@ def semantic_scores(pages: list[Page], model_name: str = DEFAULT_MODEL,
             if s >= min_value:
                 out[(i, j)] = s
     return out
+
+
+def download_model(model_name: str = DEFAULT_MODEL) -> str:
+    """Singurul loc care folosește internetul: descarcă modelul o dată, în cache-ul local."""
+    try:
+        from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
+    except ImportError as e:
+        raise SemanticUnavailable("sentence-transformers nu e instalat") from e
+    for var in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+        os.environ.pop(var, None)
+    SentenceTransformer(model_name)
+    return model_name

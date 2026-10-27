@@ -17,7 +17,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Corecturi: `python -m docaudit group-merge DIR A B` · `python -m docaudit group-detach DIR PAGINA` → `DIR/group_overrides.json`
 - Evaluare pe eșantion: `python -m docaudit group-eval DIR` (precizie, acoperire, F1 pe perechi)
 - Asemănare după sens (opțional): `pip install -e .[semantic]` + modelul descărcat o dată; rulează offline
-- Pași de test pe Windows: `docs/TESTARE_WINDOWS.md`
+- Pe Windows: `Install.bat` (venv în `%LOCALAPPDATA%\DocAudit`, fără admin; `Install.bat semantic` cu modelul), apoi `DocAudit.bat <comandă>`. Pașii de instalare și test: `docs/INSTALARE.md`
 - Planificat (Etapa 8): `pythonw -m docaudit` (tray + UI)
 
 ## Hartă
@@ -27,7 +27,9 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/model.py` — formatul normalizat v1 (Page, Manifest), citire/scriere, validare
 - `docaudit/sample.py` — generatorul eșantionului fictiv (80 pagini) și `expected.json`
 - `docaudit/safety.py` — `no_network()`, `tree_digest()`, `is_loopback()`
-- `docaudit/i18n.py` + `docaudit/locales/{ro,en}.json` — texte vizibile
+- `docaudit/i18n.py` + `docaudit/locales/{ro,en,de}.json` — texte vizibile
+- `docaudit/lang.py` — limba paginii (ro/en/de) și expresiile de „pagină învechită” în cele trei limbi
+- `Install.bat`, `DocAudit.bat` — instalare fără admin și rulare pe Windows (CRLF, fără diacritice)
 - `docaudit/__main__.py` — CLI (`sample`, `validate`, `tree`, `extract`, `profile`, `import-files`, `make-test-notebook`, `check-sample`)
 - `docaudit/extract/onenote_xml.py` — XML OneNote 2013 (ierarhie, pagină) → Page; `render_*` pentru teste și notebook-ul de test
 - `docaudit/extract/com.py` — `ReadOnlyOneNote`: doar GetHierarchy și GetPageContent
@@ -50,7 +52,9 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - **Nimic nu se șterge sau rescrie automat**: analiza e doar citire. Orice scriere în OneNote (arhivare, marcare) se face doar după decizia explicită a utilizatorului, cu previzualizare (dry-run) și copie de siguranță a paginii înainte.
 - **Arhivare = mutare, nu ștergere**: pagina ajunge în secțiunea „Arhivă” (nume configurabil) cu o notă „Mutat din: <secțiune>, <dată>, <motiv>”; se poate restaura.
 - **Date reale niciodată în repo**: `data/`, `exports/`, `*.db` sunt în `.gitignore`; testele folosesc doar eșantionul fictiv.
-- Texte UI prin i18n (ro, en). Commit-uri în română.
+- Texte UI prin i18n (ro, en, de). Commit-uri în română.
+- Documentația analizată e amestecată în română, engleză și germană: orice listă de cuvinte (titluri, semne de învechire) se scrie pentru toate trei, iar eșantionul conține pagini în toate trei.
+- Datele extrase stau implicit în `%LOCALAPPDATA%\DocAudit\data` (`data_dir()`), niciodată în clona din Google Drive. Un nume simplu dat la `--out` sau ca folder ajunge tot acolo (`resolve_folder()`).
 - Eșantionul nu are voie să dea indicii despre răspuns în id-uri sau în `source.ref`; dacă schimbi generatorul, regenerează fixture-ul (`python -m docaudit sample`) în același commit.
 - Extragerea nu scrie în OneNote: `ReadOnlyOneNote` are doar cele două metode de citire (test automat). Codul care scrie (notebook de test, apoi Etapa 7) stă în module separate.
 - Gruparea nu modifică paginile extrase; scrie doar `groups.json`. Corecturile utilizatorului (`group_overrides.json`) au prioritate față de scoruri și se păstrează între rulări.
@@ -58,4 +62,4 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Formatul de intrare are câmp `schema_version`; orice schimbare a lui = versiune nouă + migrare + notă în CHANGELOG.
 
 ## Stare
-- v0.0.4 — Etapa 4 (grupare) făcută: F1 1.00 pe eșantion, dar eșantionul e mai ușor decât datele reale (pragul se calibrează pe date reale). Etapa 3 (extragere) testată cu XML OneNote scris de mână și cu eșantionul. **Netestat pe OneNote real**: apelurile COM și notebook-ul de test (pașii în `docs/TESTARE_WINDOWS.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).
+- v0.0.4 — Etapa 4 (grupare) făcută: F1 1.00 pe eșantion, dar eșantionul e mai ușor decât datele reale (pragul se calibrează pe date reale). Etapa 3 (extragere) testată cu XML OneNote scris de mână și cu eșantionul. **Netestat pe OneNote real**: apelurile COM și notebook-ul de test (pașii în `docs/INSTALARE.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).

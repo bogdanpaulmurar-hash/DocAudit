@@ -1,5 +1,15 @@
 # CHANGELOG — DocAudit
 
+## 0.0.5 — 2026-10-27
+- Instalare fără admin pe Windows: `Install.bat` creează mediul Python în `%LOCALAPPDATA%\DocAudit\venv`, iar `Install.bat semantic` adaugă și modelul pentru asemănarea după sens. Comenzile se rulează cu `DocAudit.bat <comandă>`. De ce: testul nu trebuie să ceară pași de Python făcuți de mână.
+- Datele extrase stau implicit în `%LOCALAPPDATA%\DocAudit\data`, nu în folderul repo-ului din Google Drive, ca documentația companiei să nu se sincronizeze în Drive. În comenzi se poate scrie doar numele extragerii (de exemplu `group demo`).
+- Suport pentru documentație în română, engleză și germană: detectarea limbii, cuvinte germane ignorate în titluri (Anleitung, neu, aktualisiert, Kopie…) și semne de pagină învechită în toate trei limbile (veraltet, nicht mehr verwenden, deprecated, nu mai folosiți…). Interfața are acum și germană.
+- Eșantionul are o traducere RO→DE (în locul uneia EN) și 2 pagini unice în germană; numărul de pagini și cazurile rămân aceleași.
+- Comandă nouă `download-model`: singura care folosește internetul, o singură dată.
+- `docs/INSTALARE.md` înlocuiește `docs/TESTARE_WINDOWS.md`: instalare, test rapid fără OneNote, test pe un notebook de test, test opțional pe un notebook real.
+- Teste: 84 trecute (`pytest -q`, Linux, Python 3.13).
+- Livrare: `git pull`, apoi dublu clic pe `Install.bat`.
+
 ## 0.0.4 — 2026-10-27
 - Etapa 4: gruparea paginilor care descriu aceeași procedură, local și fără biblioteci externe. Scorul combină textul (TF-IDF pe n-grame de caractere, 70%) cu titlul curățat de cuvinte ca „ghid”, „actualizat” sau „copie” (30%). Perechile candidate se găsesc printr-un index, nu fiecare cu fiecare.
 - Grupurile se formează de la perechea cea mai asemănătoare în jos, peste un prag (implicit 0.6). `--scan` arată câte grupuri ies la fiecare prag.
