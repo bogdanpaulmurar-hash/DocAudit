@@ -1,6 +1,6 @@
 # DocAudit — Plan Etapa 1
 
-Status: **aprobat (27.10.2026)**. Etapa 2 în lucru.
+Status: **aprobat (27.10.2026)**. Etapele 2–3 făcute; Etapa 3 de verificat pe OneNote real.
 
 ## 1. Pe scurt
 

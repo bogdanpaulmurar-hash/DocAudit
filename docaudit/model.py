@@ -5,7 +5,7 @@ Orice sursă (COM OneNote, exporturi manuale, Graph) produce același folder:
     <folder>/
       manifest.json        schema_version, sursa, data extragerii, notebook-uri, selecția
       pages.jsonl          o pagină pe linie
-      images/<sha256>.png  imaginile, deduplicate după hash
+      images/<sha256>.<ext> imaginile, deduplicate după hash (png, jpg, gif...)
 
 Analiza citește doar acest format, deci nu depinde de sursă.
 """
@@ -143,6 +143,12 @@ def read_pages(folder: Path) -> list[Page]:
     return [Page.from_dict(json.loads(line)) for line in lines if line.strip()]
 
 
+def image_path(folder: Path, sha256: str) -> Path | None:
+    """Fișierul imaginii cu acest hash, oricare ar fi extensia; None dacă lipsește."""
+    matches = sorted((folder / IMAGES_DIR).glob(f"{sha256}.*"))
+    return matches[0] if matches else None
+
+
 # ---------- validare ----------
 
 def _is_iso(value: Any) -> bool:
@@ -219,7 +225,7 @@ def validate_dataset(folder: Path) -> list[str]:
         seen.add(pid)
         for img in d.get("images", []):
             sha = img.get("sha256", "")
-            if _SHA256.match(str(sha)) and not (folder / IMAGES_DIR / f"{sha}.png").is_file():
+            if _SHA256.match(str(sha)) and image_path(folder, sha) is None:
                 errors.append(f"{pid}: imaginea {sha[:12]}… lipsește din {IMAGES_DIR}/")
 
     if manifest.get("page_count") != count:
