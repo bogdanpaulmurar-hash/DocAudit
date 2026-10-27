@@ -1,6 +1,6 @@
 # DocAudit — Plan Etapa 1
 
-Status: **propus, așteaptă „da”**. Fără cod în această etapă.
+Status: **aprobat (27.10.2026)**. Etapele 2–4 făcute; Etapa 3 de verificat pe OneNote real.
 
 ## 1. Pe scurt
 
@@ -27,7 +27,7 @@ OneNote (desktop)          DocAudit (local, 127.0.0.1)
 
 ### Pas 2 — Metadate și normalizare
 Pentru fiecare pagină:
-- curățare text (spații, bullet-uri, tabele → rânduri), limbă detectată (ro/en);
+- curățare text (spații, bullet-uri, tabele → rânduri), limbă detectată (ro/en/de: documentația e amestecată);
 - **pași de procedură**: listele numerotate și liniile imperative devin o listă ordonată de pași;
 - **entități „valori”**: versiuni (`v2.3`, `build 1045`), căi (`C:\…`, `\\server\…`), URL-uri, comenzi, porturi, IP-uri, nume de aplicații, date menționate în text. Acestea sunt ce se compară la conflicte;
 - imagini: hash exact (SHA-256) + hash perceptual (aceeași captură, redimensionată); OCR local cu Tesseract — **opțional**, oprit implicit;
