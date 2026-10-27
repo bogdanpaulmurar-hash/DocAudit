@@ -13,6 +13,10 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Profiluri: `python -m docaudit profile save NUME --notebook X ...` · `python -m docaudit profile list` (în `data/profiles/`, sau `DOCAUDIT_DATA`)
 - Import exporturi manuale: `python -m docaudit import-files FOLDER [--out DIR]` (.mht, .docx)
 - Notebook de test (Windows, doar folder NOU): `python -m docaudit make-test-notebook FOLDER`; verificare: `python -m docaudit check-sample DIR`
+- Grupare: `python -m docaudit group DIR [--threshold 0.6] [--semantic] [--scan]` → `DIR/groups.json`
+- Corecturi: `python -m docaudit group-merge DIR A B` · `python -m docaudit group-detach DIR PAGINA` → `DIR/group_overrides.json`
+- Evaluare pe eșantion: `python -m docaudit group-eval DIR` (precizie, acoperire, F1 pe perechi)
+- Asemănare după sens (opțional): `pip install -e .[semantic]` + modelul descărcat o dată; rulează offline
 - Pași de test pe Windows: `docs/TESTARE_WINDOWS.md`
 - Planificat (Etapa 8): `pythonw -m docaudit` (tray + UI)
 
@@ -33,9 +37,13 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/extract/demo.py` — OneNote fals care servește eșantionul (teste, lucru fără Windows)
 - `docaudit/extract/check.py` — compară o extragere cu eșantionul
 - `docaudit/testnotebook.py` — singurul cod care scrie în OneNote până la Etapa 7, doar într-un notebook NOU
+- `docaudit/group/text.py` — normalizare (fără diacritice), titluri curățate, TF-IDF pe n-grame de caractere
+- `docaudit/group/similarity.py` — scor pe perechi (text 0.7 + titlu 0.3; sensul poate doar ridica), candidați prin index inversat
+- `docaudit/group/cluster.py` — grupuri de la perechea cea mai asemănătoare în jos, cu „unește” / „nu ține împreună”
+- `docaudit/group/overrides.py`, `run.py`, `evaluate.py`, `semantic.py` — corecturi, rulare + `groups.json`, F1, embeddings locale
 - `tests/fixtures/onenote/` — XML OneNote scris de mână (ierarhie cu Coș și grupuri, pagină cu liste, tabel, imagini, OCR)
 - `tests/fixtures/sample_v1/` — eșantionul generat (verificat byte cu byte față de generator)
-- Planificat: `docaudit/{group,compare,report,decisions,apply,ui}/`
+- Planificat: `docaudit/{compare,report,decisions,apply,ui}/`
 
 ## Reguli ale proiectului
 - **Nimic nu pleacă de pe calculator**: procesarea rulează local; fără apeluri de rețea în timpul analizei (test automat cu socket blocat). Serverul UI ascultă doar pe 127.0.0.1. Modelele (embeddings, OCR, LLM local) sunt opționale, descărcate o singură dată, rulate offline.
@@ -45,8 +53,9 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Texte UI prin i18n (ro, en). Commit-uri în română.
 - Eșantionul nu are voie să dea indicii despre răspuns în id-uri sau în `source.ref`; dacă schimbi generatorul, regenerează fixture-ul (`python -m docaudit sample`) în același commit.
 - Extragerea nu scrie în OneNote: `ReadOnlyOneNote` are doar cele două metode de citire (test automat). Codul care scrie (notebook de test, apoi Etapa 7) stă în module separate.
+- Gruparea nu modifică paginile extrase; scrie doar `groups.json`. Corecturile utilizatorului (`group_overrides.json`) au prioritate față de scoruri și se păstrează între rulări.
 - Imaginile se salvează ca `images/<sha256>.<ext>`; folosește `model.image_path()` ca să le găsești.
 - Formatul de intrare are câmp `schema_version`; orice schimbare a lui = versiune nouă + migrare + notă în CHANGELOG.
 
 ## Stare
-- v0.0.3 — Etapa 3 (extragere) făcută și testată cu XML OneNote scris de mână și cu eșantionul. **Netestat pe OneNote real**: apelurile COM și notebook-ul de test (pașii în `docs/TESTARE_WINDOWS.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).
+- v0.0.4 — Etapa 4 (grupare) făcută: F1 1.00 pe eșantion, dar eșantionul e mai ușor decât datele reale (pragul se calibrează pe date reale). Etapa 3 (extragere) testată cu XML OneNote scris de mână și cu eșantionul. **Netestat pe OneNote real**: apelurile COM și notebook-ul de test (pașii în `docs/TESTARE_WINDOWS.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).

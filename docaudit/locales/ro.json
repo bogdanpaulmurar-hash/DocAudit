@@ -30,5 +30,19 @@
   "cli.testnb.folder": "Folder nou pentru notebook (nu trebuie să existe)",
   "cli.testnb.done": "Notebook de test creat: {pages} pagini în {path}",
   "cli.check.help": "Compară o extragere cu eșantionul fictiv",
-  "cli.check.result": "{count} diferențe față de eșantion"
+  "cli.check.result": "{count} diferențe față de eșantion",
+  "cli.group.help": "Grupează paginile care descriu aceeași procedură",
+  "cli.group.threshold": "Pragul de asemănare, între 0 și 1 (implicit 0.6)",
+  "cli.group.semantic": "Folosește și asemănarea după sens (model local, opțional)",
+  "cli.group.scan": "Arată câte grupuri ies la fiecare prag, fără să salveze",
+  "cli.group.scanrow": "prag {threshold:.2f}: {groups} grupuri, {pages} pagini grupate",
+  "cli.group.row": "{count} pagini · scor {score:.2f} · {label}",
+  "cli.group.done": "{groups} grupuri, {alone} pagini fără pereche (prag {threshold})",
+  "cli.group.nosemantic": "Asemănarea după sens nu e disponibilă: {error}",
+  "cli.groupeval.help": "Compară grupurile cu răspunsurile corecte ale eșantionului",
+  "cli.groupeval.result": "Precizie {precision:.2f} · acoperire {recall:.2f} · F1 {f1:.2f}",
+  "cli.groupmerge.help": "Pune mereu două pagini în același grup",
+  "cli.groupdetach.help": "Scoate o pagină din grupul ei",
+  "cli.groupdetach.notfound": "Pagina {page} nu e în niciun grup",
+  "cli.groupoverride.saved": "Corectura a fost salvată; rulează din nou „group”."
 }

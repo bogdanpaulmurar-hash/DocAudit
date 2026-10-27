@@ -9,6 +9,10 @@
     python -m docaudit import-files FOLDER [--out DIR]
     python -m docaudit make-test-notebook FOLDER   (Windows: notebook NOU cu eșantionul)
     python -m docaudit check-sample DIR            (compară o extragere cu eșantionul)
+    python -m docaudit group DIR [--threshold 0.6] [--semantic] [--scan]
+    python -m docaudit group-eval DIR [--expected FILE]
+    python -m docaudit group-merge DIR PAGINA_A PAGINA_B
+    python -m docaudit group-detach DIR PAGINA
 """
 
 from __future__ import annotations
@@ -91,6 +95,25 @@ def main(argv: list[str] | None = None) -> int:
     p_chk = sub.add_parser("check-sample", help=t("cli.check.help"))
     p_chk.add_argument("folder", type=Path)
 
+    p_grp = sub.add_parser("group", help=t("cli.group.help"))
+    p_grp.add_argument("folder", type=Path)
+    p_grp.add_argument("--threshold", type=float, default=None, help=t("cli.group.threshold"))
+    p_grp.add_argument("--semantic", action="store_true", help=t("cli.group.semantic"))
+    p_grp.add_argument("--scan", action="store_true", help=t("cli.group.scan"))
+
+    p_gev = sub.add_parser("group-eval", help=t("cli.groupeval.help"))
+    p_gev.add_argument("folder", type=Path)
+    p_gev.add_argument("--expected", type=Path, default=None)
+
+    p_gm = sub.add_parser("group-merge", help=t("cli.groupmerge.help"))
+    p_gm.add_argument("folder", type=Path)
+    p_gm.add_argument("page_a")
+    p_gm.add_argument("page_b")
+
+    p_gd = sub.add_parser("group-detach", help=t("cli.groupdetach.help"))
+    p_gd.add_argument("folder", type=Path)
+    p_gd.add_argument("page")
+
     p_imp = sub.add_parser("import-files", help=t("cli.import.help"))
     p_imp.add_argument("folder", type=Path)
     p_imp.add_argument("--out", type=Path, help=t("cli.extract.out"))
@@ -138,6 +161,9 @@ def main(argv: list[str] | None = None) -> int:
         print(t("cli.check.result", count=len(problems)))
         return 1 if problems else 0
 
+    if args.cmd in ("group", "group-eval", "group-merge", "group-detach"):
+        return _group_commands(args)
+
     if args.cmd == "import-files":
         from .extract.files import import_files
 
@@ -179,6 +205,54 @@ def main(argv: list[str] | None = None) -> int:
     print(t("cli.extract.done", total=report.total, fetched=report.fetched, reused=report.reused,
             skipped=report.skipped, removed=report.removed, path=out))
     return 1 if report.errors else 0
+
+
+def _group_commands(args: argparse.Namespace) -> int:
+    import json
+
+    from .group.overrides import GroupOverrides
+    from .group.run import DEFAULT_THRESHOLD, load_groups, run_grouping, scan_thresholds
+    from .group.semantic import SemanticUnavailable
+
+    folder = args.folder
+    if args.cmd == "group":
+        try:
+            if args.scan:
+                for th, n_groups, n_pages in scan_thresholds(
+                        folder, [round(0.3 + 0.05 * i, 2) for i in range(14)], use_semantic=args.semantic):
+                    print(t("cli.group.scanrow", threshold=th, groups=n_groups, pages=n_pages))
+                return 0
+            threshold = args.threshold if args.threshold is not None else DEFAULT_THRESHOLD
+            result = run_grouping(folder, threshold, use_semantic=args.semantic)
+        except SemanticUnavailable as e:
+            print(t("cli.group.nosemantic", error=e))
+            return 2
+        for g in result.groups:
+            print(t("cli.group.row", label=g.label, count=len(g.pages), score=g.avg_score))
+        print(t("cli.group.done", groups=len(result.groups), alone=len(result.ungrouped), threshold=threshold))
+        return 0
+
+    if args.cmd == "group-eval":
+        from .group.evaluate import evaluate
+
+        expected = json.loads((args.expected or folder / "expected.json").read_text("utf-8"))
+        data = load_groups(folder)
+        score = evaluate([g["pages"] for g in data["groups"]], expected, with_translations=data["semantic"])
+        print(t("cli.groupeval.result", precision=score.precision, recall=score.recall, f1=score.f1))
+        return 0
+
+    ov = GroupOverrides.load(folder)
+    if args.cmd == "group-merge":
+        ov.merge(args.page_a, args.page_b)
+    else:
+        group = next((g for g in load_groups(folder)["groups"] if args.page in g["pages"]), None)
+        if group is None:
+            print(t("cli.groupdetach.notfound", page=args.page))
+            return 1
+        ov.detach(args.page, group["pages"])
+    ov.save(folder)
+    print(t("cli.groupoverride.saved"))
+    return 0
 
 
 if __name__ == "__main__":

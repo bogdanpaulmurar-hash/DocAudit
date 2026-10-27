@@ -40,6 +40,28 @@ NOTEBOOKS = {
 
 STALE_NOTE = "Notă: varianta veche, nu mai folosiți după migrarea din 2021."
 
+# Variantele nu copiază textul exact: verbele se schimbă, apar note în plus.
+REWORD = {
+    "Deschide": "Accesează", "Alege": "Selectează", "Verifică": "Controlează",
+    "Completează": "Introdu", "Apasă": "Dă clic pe", "Rulează": "Pornește",
+    "Trimite": "Expediază", "Instalează": "Pune", "Descarcă": "Ia", "Setează": "Configurează",
+    "Introdu": "Scrie", "Notează": "Scrie", "Caută": "Găsește", "Predă": "Lasă",
+}
+EXTRA_NOTES = [
+    "Dacă apare o eroare, deschide un tichet la helpdesk.example.test.",
+    "Durata estimată: aproximativ 15 minute.",
+    "Pentru întrebări, folosește canalul intern de suport.",
+    "Procedura a fost revizuită după feedback-ul echipei.",
+]
+
+
+def _reword(step: str, rng: random.Random) -> str:
+    first, _, rest = step.partition(" ")
+    if first in REWORD and rng.random() < 0.6:
+        return f"{REWORD[first]} {rest}"
+    return step
+
+
 INTROS = [
     "Procedura de mai jos se aplică tuturor angajaților.",
     "Pași verificați de echipa IT.",
@@ -516,6 +538,10 @@ def build_sample(seed: int = DEFAULT_SEED) -> tuple[Manifest, list[Page], dict[s
                 role = "stale"
                 if gi in STALE_WITH_NOTE or not proc.old:
                     note = STALE_NOTE
+            if vi > 0:
+                steps = [_reword(st, rng) for st in steps]
+                if not note and rng.random() < 0.4:
+                    note = rng.choice(EXTRA_NOTES)
             title = title_forms[vi % len(title_forms)].format(t=proc.title, tl=proc.title.lower())
             drafts.append(_Draft(
                 role=role, title=title, notebook=nb, section=sec,

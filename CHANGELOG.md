@@ -1,5 +1,15 @@
 # CHANGELOG — DocAudit
 
+## 0.0.4 — 2026-10-27
+- Etapa 4: gruparea paginilor care descriu aceeași procedură, local și fără biblioteci externe. Scorul combină textul (TF-IDF pe n-grame de caractere, 70%) cu titlul curățat de cuvinte ca „ghid”, „actualizat” sau „copie” (30%). Perechile candidate se găsesc printr-un index, nu fiecare cu fiecare.
+- Grupurile se formează de la perechea cea mai asemănătoare în jos, peste un prag (implicit 0.6). `--scan` arată câte grupuri ies la fiecare prag.
+- Corecturile tale se păstrează între rulări: „unește” două pagini, „scoate din grup” o pagină (ea nu se mai leagă de paginile acelui grup).
+- Asemănare după sens, opțională (`pip install -e .[semantic]`, model multilingv local, rețeaua blocată la încărcare): poate doar ridica scorul, de exemplu pentru traduceri RO↔EN.
+- Eșantionul are acum variante reformulate (alte verbe, note în plus); fixture-ul a fost regenerat, cazurile plantate sunt aceleași.
+- Rezultate: pe eșantion F1 1.00 (precizie 1.00, acoperire 1.00) la orice prag între 0.4 și 0.7. Paginile-capcană și traducerile rămân negrupate, cum era de așteptat fără sens. 2000 de pagini sintetice se compară în ~9 s.
+- Teste: 72 trecute (`pytest -q`, Linux, Python 3.13).
+- Livrare: comenzi noi `group`, `group-eval`, `group-merge`, `group-detach`; nimic de reinstalat în afară de `pip install -e .`.
+
 ## 0.0.3 — 2026-10-27
 - Etapa 3: extragerea din OneNote desktop prin COM, strict doar citire (`ReadOnlyOneNote` expune doar GetHierarchy și GetPageContent). De ce: paginile alese ajung în formatul v1 fără ca DocAudit să poată modifica ceva în OneNote.
 - Parser XML OneNote 2013: grupuri de secțiuni, Coșul de reciclare ignorat, titluri (h1–h6), liste numerotate și cu buline (pe niveluri), tabele, imagini (base64, OCR-ul OneNote), linkuri, fișiere atașate, contururi în ordinea de citire.

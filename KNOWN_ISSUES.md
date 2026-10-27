@@ -12,3 +12,5 @@ Erori și modificări deschise. Când un punct e rezolvat și confirmat, se mut�
 | 8 | risc | Apelurile COM (`GetHierarchy`, `GetPageContent` cu parametri de ieșire prin pywin32) n-au rulat încă pe OneNote real. Codul încearcă două semnături; dacă ambele eșuează, `tree` afișează eroarea. De verificat cu `docs/TESTARE_WINDOWS.md`. | deschis |
 | 9 | limită | OneNote nu permite setarea datei de modificare, deci în notebook-ul de test toate paginile par modificate azi. Notebook-ul verifică extragerea, nu detectarea paginilor învechite (aceea se testează pe eșantion). | deschis |
 | 10 | limită | Exporturile .onepkg (pachet de notebook) nu sunt suportate; pentru import fără COM se folosesc .mht sau .docx per pagină. | deschis |
+| 11 | limită | Eșantionul fictiv e mai ușor decât documentația reală (F1 1.00 la orice prag rezonabil), deci nu poate calibra pragul. Pragul implicit 0.6 trebuie verificat pe date reale cu `group --scan` și corecturi manuale. | deschis |
+| 12 | risc | Asemănarea după sens (`--semantic`) n-a rulat cu un model real: modelul nu e instalat în mediul de test. Formula e testată cu scoruri simulate. | deschis |

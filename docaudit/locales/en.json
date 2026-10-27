@@ -30,5 +30,19 @@
   "cli.testnb.folder": "New folder for the notebook (must not exist)",
   "cli.testnb.done": "Test notebook created: {pages} pages in {path}",
   "cli.check.help": "Compare an extraction with the fictional sample",
-  "cli.check.result": "{count} differences from the sample"
+  "cli.check.result": "{count} differences from the sample",
+  "cli.group.help": "Group pages that describe the same procedure",
+  "cli.group.threshold": "Similarity threshold between 0 and 1 (default 0.6)",
+  "cli.group.semantic": "Also use meaning similarity (local model, optional)",
+  "cli.group.scan": "Show how many groups each threshold gives, without saving",
+  "cli.group.scanrow": "threshold {threshold:.2f}: {groups} groups, {pages} pages grouped",
+  "cli.group.row": "{count} pages · score {score:.2f} · {label}",
+  "cli.group.done": "{groups} groups, {alone} pages without a match (threshold {threshold})",
+  "cli.group.nosemantic": "Meaning similarity is not available: {error}",
+  "cli.groupeval.help": "Compare the groups with the sample's correct answers",
+  "cli.groupeval.result": "Precision {precision:.2f} · recall {recall:.2f} · F1 {f1:.2f}",
+  "cli.groupmerge.help": "Always put two pages in the same group",
+  "cli.groupdetach.help": "Take a page out of its group",
+  "cli.groupdetach.notfound": "Page {page} is not in any group",
+  "cli.groupoverride.saved": "Correction saved; run “group” again."
 }
