@@ -1,0 +1,220 @@
+"""Scrierea în OneNote, folosită DOAR de „Aplică” (după decizia și confirmarea utilizatorului).
+
+Separat de extragere: `extract.com.ReadOnlyOneNote` rămâne doar citire.
+
+Operațiile permise sunt puține și reversibile:
+- create_section: secțiunea „Arhivă” într-un notebook, dacă lipsește;
+- create_page + update_page: copia paginii în Arhivă (sau înapoi, la restaurare);
+- update_page cu XML parțial: doar titlul (prefixul „[ÎNVECHIT]”);
+- delete_page: trimite pagina în Coșul OneNote (recuperabilă din OneNote), nu definitiv.
+
+`FakeOneNote` imită aceleași operații într-un fișier JSON: îl folosesc testele
+și modul demo, ca tot fluxul să se poată încerca fără OneNote.
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Protocol
+
+from ..extract.com import HS_PAGES, PI_BINARY_DATA, XS_2013, OneNoteError
+from ..extract.onenote_xml import ONE, render_page_xml
+from .xmlops import title_of
+
+CFT_SECTION = 3  # CreateFileType.cftSection
+NPS_DEFAULT = 0
+
+
+class WritableOneNote(Protocol):
+    def get_hierarchy_xml(self) -> str: ...
+
+    def get_page_xml(self, page_id: str) -> str: ...
+
+    def create_section(self, notebook_id: str, name: str) -> str: ...
+
+    def create_page(self, section_id: str) -> str: ...
+
+    def update_page(self, xml: str) -> None: ...
+
+    def delete_page(self, page_id: str) -> None: ...
+
+
+class ComOneNote:  # pragma: no cover - doar pe Windows, cu OneNote desktop
+    """OneNote desktop prin COM, cu operațiile de scriere de mai sus și nimic altceva."""
+
+    def __init__(self) -> None:
+        try:
+            import pythoncom  # type: ignore[import-not-found]
+            import win32com.client  # type: ignore[import-not-found]
+        except ImportError as e:
+            raise OneNoteError("pywin32 lipsește sau sistemul nu e Windows") from e
+        pythoncom.CoInitialize()
+        self._missing = pythoncom.Missing
+        try:
+            self._app = win32com.client.gencache.EnsureDispatch("OneNote.Application")
+        except Exception as e:
+            raise OneNoteError("OneNote desktop nu răspunde prin COM") from e
+
+    @staticmethod
+    def _out(result):
+        if isinstance(result, tuple):
+            result = next((r for r in result if isinstance(r, str)), None)
+        return result
+
+    def get_hierarchy_xml(self) -> str:
+        return self._out(self._app.GetHierarchy("", HS_PAGES, self._missing, XS_2013))
+
+    def get_page_xml(self, page_id: str) -> str:
+        return self._out(self._app.GetPageContent(page_id, self._missing, PI_BINARY_DATA, XS_2013))
+
+    def create_section(self, notebook_id: str, name: str) -> str:
+        return self._out(self._app.OpenHierarchy(f"{name}.one", notebook_id, self._missing, CFT_SECTION))
+
+    def create_page(self, section_id: str) -> str:
+        return self._out(self._app.CreateNewPage(section_id, self._missing, NPS_DEFAULT))
+
+    def update_page(self, xml: str) -> None:
+        self._app.UpdatePageContent(xml, 0, XS_2013)
+
+    def delete_page(self, page_id: str) -> None:
+        self._app.DeleteHierarchy(page_id, 0, False)  # False = în Coș, nu definitiv
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class FakeOneNote:
+    """OneNote fals, ținut într-un fișier JSON (notebook-uri, secțiuni, pagini cu XML-ul lor)."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.state = json.loads(path.read_text("utf-8")) if path.is_file() else {"notebooks": []}
+        self.calls: list[str] = []
+
+    @classmethod
+    def from_sample(cls, path: Path) -> "FakeOneNote":
+        from ..extract.onenote_xml import ImageData
+        from ..sample import build_sample
+
+        _, pages, images, _ = build_sample()
+        imgs = {sha: ImageData("png", data) for sha, data in images.items()}
+        fake = cls(path)
+        fake.state = {"notebooks": []}
+        for p in pages:
+            nb = fake._notebook(p.notebook, create=True)
+            sec = fake._section(nb, "/".join(p.section_path), create=True)
+            sec["pages"].append({"id": p.id, "name": p.title, "dateTime": p.created,
+                                 "lastModifiedTime": p.modified, "xml": render_page_xml(p, imgs),
+                                 "recycled": False})
+        fake.save()
+        return fake
+
+    def save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.state, ensure_ascii=False), encoding="utf-8", newline="\n")
+
+    def _notebook(self, name: str, create: bool = False) -> dict:
+        for nb in self.state["notebooks"]:
+            if nb["name"] == name or nb["id"] == name:
+                return nb
+        if not create:
+            raise OneNoteError(f"notebook inexistent: {name}")
+        nb = {"id": f"nb:{name}", "name": name, "sections": []}
+        self.state["notebooks"].append(nb)
+        return nb
+
+    @staticmethod
+    def _section(nb: dict, path: str, create: bool = False) -> dict:
+        for s in nb["sections"]:
+            if s["path"] == path:
+                return s
+        if not create:
+            raise OneNoteError(f"secțiune inexistentă: {path}")
+        s = {"id": f"sec:{nb['name']}/{path}", "path": path, "pages": []}
+        nb["sections"].append(s)
+        return s
+
+    def _find(self, page_id: str) -> tuple[dict, dict, dict]:
+        for nb in self.state["notebooks"]:
+            for s in nb["sections"]:
+                for p in s["pages"]:
+                    if p["id"] == page_id:
+                        return nb, s, p
+        raise OneNoteError(f"pagină inexistentă: {page_id}")
+
+    # --- citire, ca OneNote ---
+    def get_hierarchy_xml(self) -> str:
+        root = ET.Element(f"{ONE}Notebooks")
+        for nb in self.state["notebooks"]:
+            nb_el = ET.SubElement(root, f"{ONE}Notebook", {"ID": nb["id"], "name": nb["name"], "nickname": nb["name"]})
+            containers: dict[tuple[str, ...], ET.Element] = {(): nb_el}
+            for s in nb["sections"]:
+                parts = s["path"].split("/")
+                parent = nb_el
+                for depth in range(len(parts) - 1):
+                    key = tuple(parts[: depth + 1])
+                    if key not in containers:
+                        containers[key] = ET.SubElement(parent, f"{ONE}SectionGroup", {"name": parts[depth],
+                                                                                        "ID": f"sg:{'/'.join(key)}"})
+                    parent = containers[key]
+                sec_el = ET.SubElement(parent, f"{ONE}Section", {"ID": s["id"], "name": parts[-1]})
+                for p in s["pages"]:
+                    attrs = {"ID": p["id"], "name": p["name"], "dateTime": p["dateTime"],
+                             "lastModifiedTime": p["lastModifiedTime"], "pageLevel": "1"}
+                    if p["recycled"]:
+                        attrs["isInRecycleBin"] = "true"
+                    ET.SubElement(sec_el, f"{ONE}Page", attrs)
+        return ET.tostring(root, encoding="unicode")
+
+    def get_page_xml(self, page_id: str) -> str:
+        return self._find(page_id)[2]["xml"]
+
+    # --- scriere ---
+    def create_section(self, notebook_id: str, name: str) -> str:
+        self.calls.append(f"create_section {name}")
+        nb = self._notebook(notebook_id)
+        sec = self._section(nb, name, create=True)
+        self.save()
+        return sec["id"]
+
+    def create_page(self, section_id: str) -> str:
+        self.calls.append("create_page")
+        for nb in self.state["notebooks"]:
+            for s in nb["sections"]:
+                if s["id"] == section_id:
+                    pid = "{" + str(uuid.uuid4()).upper() + "}"
+                    now = _now()
+                    s["pages"].append({"id": pid, "name": "", "dateTime": now, "lastModifiedTime": now,
+                                       "xml": f'<one:Page xmlns:one="{ONE[1:-1]}" ID="{pid}" />',
+                                       "recycled": False})
+                    self.save()
+                    return pid
+        raise OneNoteError(f"secțiune inexistentă: {section_id}")
+
+    def update_page(self, xml: str) -> None:
+        self.calls.append("update_page")
+        new = ET.fromstring(xml)
+        _, _, page = self._find(new.get("ID", ""))
+        children = [c for c in new if c.tag != f"{ONE}Title"]
+        if children or ET.fromstring(page["xml"]).find(f"{ONE}Title") is None:
+            page["xml"] = xml  # conținut complet
+        else:  # doar titlul
+            old = ET.fromstring(page["xml"])
+            old.remove(old.find(f"{ONE}Title"))
+            old.insert(0, new.find(f"{ONE}Title"))
+            page["xml"] = ET.tostring(old, encoding="unicode")
+        page["name"] = title_of(page["xml"])
+        page["lastModifiedTime"] = _now()
+        self.save()
+
+    def delete_page(self, page_id: str) -> None:
+        self.calls.append("delete_page")
+        _, _, page = self._find(page_id)
+        page["recycled"] = True
+        self.save()
+
