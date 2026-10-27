@@ -47,5 +47,22 @@
   "cli.groupoverride.saved": "Correction saved; run “group” again.",
   "cli.model.help": "Download the meaning-similarity model once (the only command that uses the internet)",
   "cli.model.done": "Model ready: {model}. From now on it runs offline.",
-  "cli.model.missing": "sentence-transformers is missing: run Install.bat semantic"
+  "cli.model.missing": "sentence-transformers is missing: run Install.bat semantic",
+  "cli.compare.help": "Compare the pages in each group: conflicts, different steps, duplicates, outdated pages",
+  "cli.compare.nogroups": "groups.json is missing in {path}: run “group” first.",
+  "cli.compare.group": "■ {label} — {count} findings · looks current: {reference}",
+  "cli.compare.value_conflict": "  value conflict: {values}",
+  "cli.compare.missing_step": "  {pages} is missing the step: {text}",
+  "cli.compare.extra_step": "  {pages} has an extra step: {text}",
+  "cli.compare.reordered": "  {page}: steps in a different order ({text})",
+  "cli.compare.duplicate": "  almost identical ({similarity:.0%}): {pages}",
+  "cli.compare.stale": "  probably outdated: {page} ({reasons})",
+  "cli.compare.shared_image": "same image on: {pages}",
+  "cli.compare.reason.marker": "says “{value}”",
+  "cli.compare.reason.lower_version": "lower version: {value} instead of {other}",
+  "cli.compare.reason.old_minority_value": "old value: {value}",
+  "cli.compare.reason.old": "{days} days older than the newest page",
+  "cli.compare.done": "{groups} groups compared: {conflicts} conflicts, {steps} step differences, {duplicates} duplicates, {stale} probably outdated pages. Nothing was changed.",
+  "cli.compareeval.help": "Compare the findings with the sample's correct answers",
+  "cli.compareeval.result": "Conflicts found {found}/{planted} (false alarms {false_rate:.0%}) · steps {steps_found}/{steps_planted} · outdated {stale_found}/{stale_planted} (+{stale_extra} extra) · duplicates {dup_found}/{dup_planted}"
 }

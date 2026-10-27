@@ -16,3 +16,6 @@ Erori și modificări deschise. Când un punct e rezolvat și confirmat, se mut�
 | 12 | risc | Asemănarea după sens (`--semantic`) n-a rulat cu un model real: modelul nu e instalat în mediul de test. Formula e testată cu scoruri simulate. | deschis |
 | 13 | limită | Aceeași procedură scrisă în limbi diferite (RO / EN / DE) nu se grupează doar după text: e nevoie de asemănarea după sens (`Install.bat semantic`). Fără model, traducerile apar ca pagini separate. | deschis |
 | 14 | risc | `Install.bat` n-a rulat încă pe Windows; instalarea editabilă dintr-un folder Google Drive poate fi lentă la prima rulare. | deschis |
+| 15 | limită | Compararea pe eșantion iese perfectă (20/20 conflicte, 0 alarme false), dar eșantionul are pași în liste numerotate și valori clare. Pe date reale pot apărea pagini fără liste (pașii nu se găsesc), valori scrise în proză și alarme false din reformulări. De verificat cu `compare real`. | deschis |
+| 16 | limită | Când un grup are doar două pagini cu pași în altă ordine, nu se poate spune care e cea corectă: constatarea le numește pe amândouă. | deschis |
+| 17 | limită | Paginile în altă limbă decât restul grupului (traduceri) nu se compară pas cu pas, deci un conflict de valori între o pagină RO și una DE nu se vede încă. | deschis |

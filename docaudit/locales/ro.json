@@ -47,5 +47,22 @@
   "cli.groupoverride.saved": "Corectura a fost salvată; rulează din nou „group”.",
   "cli.model.help": "Descarcă o singură dată modelul pentru asemănarea după sens (singura comandă cu internet)",
   "cli.model.done": "Model pregătit: {model}. De acum rulează offline.",
-  "cli.model.missing": "sentence-transformers lipsește: rulează Install.bat semantic"
+  "cli.model.missing": "sentence-transformers lipsește: rulează Install.bat semantic",
+  "cli.compare.help": "Compară paginile din fiecare grup: conflicte, pași diferiți, duplicate, pagini învechite",
+  "cli.compare.nogroups": "Lipsește groups.json în {path}: rulează întâi „group”.",
+  "cli.compare.group": "■ {label} — {count} constatări · pare versiunea curentă: {reference}",
+  "cli.compare.value_conflict": "  conflict de valori: {values}",
+  "cli.compare.missing_step": "  {pages} nu are pasul: {text}",
+  "cli.compare.extra_step": "  {pages} are un pas în plus: {text}",
+  "cli.compare.reordered": "  {page}: pași în altă ordine ({text})",
+  "cli.compare.duplicate": "  aproape identice ({similarity:.0%}): {pages}",
+  "cli.compare.stale": "  probabil învechită: {page} ({reasons})",
+  "cli.compare.shared_image": "aceeași imagine pe: {pages}",
+  "cli.compare.reason.marker": "scrie „{value}”",
+  "cli.compare.reason.lower_version": "versiune mai mică: {value} față de {other}",
+  "cli.compare.reason.old_minority_value": "valoare veche: {value}",
+  "cli.compare.reason.old": "mai veche cu {days} zile decât cea mai nouă pagină",
+  "cli.compare.done": "{groups} grupuri comparate: {conflicts} conflicte, {steps} diferențe de pași, {duplicates} duplicate, {stale} pagini probabil învechite. Nimic nu s-a modificat.",
+  "cli.compareeval.help": "Compară constatările cu răspunsurile corecte ale eșantionului",
+  "cli.compareeval.result": "Conflicte găsite {found}/{planted} (alarme false {false_rate:.0%}) · pași {steps_found}/{steps_planted} · învechite {stale_found}/{stale_planted} (+{stale_extra} în plus) · duplicate {dup_found}/{dup_planted}"
 }
