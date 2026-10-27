@@ -1,0 +1,16 @@
+# Date reale: niciodată în repo
+data/
+exports/
+backups/
+*.db
+*.sqlite
+*.onepkg
+*.one
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
