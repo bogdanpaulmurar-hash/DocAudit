@@ -47,5 +47,22 @@
   "cli.groupoverride.saved": "Korrektur gespeichert; „group“ erneut ausführen.",
   "cli.model.help": "Lädt das Modell für Bedeutungsähnlichkeit einmalig herunter (einziger Befehl mit Internet)",
   "cli.model.done": "Modell bereit: {model}. Ab jetzt läuft es offline.",
-  "cli.model.missing": "sentence-transformers fehlt: Install.bat semantic ausführen"
+  "cli.model.missing": "sentence-transformers fehlt: Install.bat semantic ausführen",
+  "cli.compare.help": "Vergleicht die Seiten jeder Gruppe: Konflikte, abweichende Schritte, Duplikate, veraltete Seiten",
+  "cli.compare.nogroups": "groups.json fehlt in {path}: zuerst „group“ ausführen.",
+  "cli.compare.group": "■ {label} — {count} Befunde · wirkt aktuell: {reference}",
+  "cli.compare.value_conflict": "  Wertkonflikt: {values}",
+  "cli.compare.missing_step": "  {pages} fehlt der Schritt: {text}",
+  "cli.compare.extra_step": "  {pages} hat einen zusätzlichen Schritt: {text}",
+  "cli.compare.reordered": "  {page}: Schritte in anderer Reihenfolge ({text})",
+  "cli.compare.duplicate": "  fast identisch ({similarity:.0%}): {pages}",
+  "cli.compare.stale": "  wahrscheinlich veraltet: {page} ({reasons})",
+  "cli.compare.shared_image": "gleiches Bild auf: {pages}",
+  "cli.compare.reason.marker": "enthält „{value}“",
+  "cli.compare.reason.lower_version": "niedrigere Version: {value} statt {other}",
+  "cli.compare.reason.old_minority_value": "alter Wert: {value}",
+  "cli.compare.reason.old": "{days} Tage älter als die neueste Seite",
+  "cli.compare.done": "{groups} Gruppen verglichen: {conflicts} Konflikte, {steps} Schrittabweichungen, {duplicates} Duplikate, {stale} wahrscheinlich veraltete Seiten. Nichts wurde geändert.",
+  "cli.compareeval.help": "Vergleicht die Befunde mit den richtigen Antworten der Probe",
+  "cli.compareeval.result": "Konflikte gefunden {found}/{planted} (Fehlalarme {false_rate:.0%}) · Schritte {steps_found}/{steps_planted} · veraltet {stale_found}/{stale_planted} (+{stale_extra} zusätzlich) · Duplikate {dup_found}/{dup_planted}"
 }

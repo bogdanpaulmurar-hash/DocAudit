@@ -1,5 +1,16 @@
 # CHANGELOG — DocAudit
 
+## 0.0.6 — 2026-10-27
+- Etapa 5: compararea paginilor din fiecare grup, local și doar citire. Comanda `compare` scrie `findings.json` lângă date și nu modifică paginile, grupurile sau OneNote.
+- Pașii se aliniază între pagini chiar dacă sunt reformulați: valorile (cifre, căi, adrese, coduri ca GRP-Users, opțiuni de comandă) sunt înlocuite cu un semn comun înainte de comparare.
+- Constatări: conflicte de valori (cu valoarea fiecărei pagini), pași lipsă, pași în plus, pași în altă ordine, duplicate aproape identice și aceeași imagine pe mai multe pagini.
+- Pagini probabil învechite, cu motivul afișat: „nu mai folosiți” / „deprecated” / „veraltet” în text, versiune mai mică (4.1 față de 5.2, backup_v1 față de backup_v2), valoare în minoritate pe o pagină mult mai veche, sau pagina e cu peste 3 ani mai veche decât cea mai nouă din grup.
+- Pentru fiecare grup, o pagină sugerată ca versiunea curentă: nu e învechită și are cele mai multe valori comune cu restul. Sugestia nu se aplică.
+- Paginile în altă limbă decât restul grupului (de exemplu o traducere DE) nu se compară pas cu pas, ca să nu apară pași „lipsă” falși.
+- Rezultate pe eșantion: conflicte 20/20, alarme false 0%, învechite 10/10, diferențe de pași 6/6, duplicate 5/5, sub o secundă.
+- Teste: 94 trecute (`pytest -q`, Linux, Python 3.13).
+- Livrare: comenzi noi `compare` și `compare-eval`; `git pull`, apoi `DocAudit.bat compare demo`.
+
 ## 0.0.5 — 2026-10-27
 - Instalare fără admin pe Windows: `Install.bat` creează mediul Python în `%LOCALAPPDATA%\DocAudit\venv`, iar `Install.bat semantic` adaugă și modelul pentru asemănarea după sens. Comenzile se rulează cu `DocAudit.bat <comandă>`. De ce: testul nu trebuie să ceară pași de Python făcuți de mână.
 - Datele extrase stau implicit în `%LOCALAPPDATA%\DocAudit\data`, nu în folderul repo-ului din Google Drive, ca documentația companiei să nu se sincronizeze în Drive. În comenzi se poate scrie doar numele extragerii (de exemplu `group demo`).

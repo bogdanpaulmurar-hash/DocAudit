@@ -13,6 +13,8 @@
     python -m docaudit group-eval DIR [--expected FILE]
     python -m docaudit group-merge DIR PAGINA_A PAGINA_B
     python -m docaudit group-detach DIR PAGINA
+    python -m docaudit compare DIR                 (după „group”; scrie findings.json)
+    python -m docaudit compare-eval DIR [--expected FILE]
     python -m docaudit download-model              (o singură dată, singura comandă cu internet)
 """
 
@@ -130,6 +132,13 @@ def main(argv: list[str] | None = None) -> int:
     p_gd.add_argument("folder", type=Path)
     p_gd.add_argument("page")
 
+    p_cmp = sub.add_parser("compare", help=t("cli.compare.help"))
+    p_cmp.add_argument("folder", type=Path)
+
+    p_cev = sub.add_parser("compare-eval", help=t("cli.compareeval.help"))
+    p_cev.add_argument("folder", type=Path)
+    p_cev.add_argument("--expected", type=Path, default=None)
+
     sub.add_parser("download-model", help=t("cli.model.help"))
 
     p_imp = sub.add_parser("import-files", help=t("cli.import.help"))
@@ -182,6 +191,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd in ("group", "group-eval", "group-merge", "group-detach"):
         return _group_commands(args)
+
+    if args.cmd in ("compare", "compare-eval"):
+        return _compare_commands(args)
 
     if args.cmd == "download-model":
         from .group.semantic import SemanticUnavailable, download_model
@@ -282,6 +294,75 @@ def _group_commands(args: argparse.Namespace) -> int:
     ov.save(folder)
     print(t("cli.groupoverride.saved"))
     return 0
+
+
+def _compare_commands(args: argparse.Namespace) -> int:
+    import json
+
+    from .compare.run import load_findings, run_compare
+
+    folder = resolve_folder(args.folder)
+    if args.cmd == "compare-eval":
+        from .compare.evaluate import evaluate_compare
+
+        expected = json.loads((args.expected or folder / "expected.json").read_text("utf-8"))
+        s = evaluate_compare(load_findings(folder), expected)
+        print(t("cli.compareeval.result", found=s.conflicts_found, planted=s.conflicts_planted,
+                false_rate=s.false_alarm_rate, steps_found=s.step_diffs_found, steps_planted=s.step_diffs_planted,
+                stale_found=s.stale_found, stale_planted=s.stale_planted, stale_extra=s.stale_extra,
+                dup_found=s.duplicates_found, dup_planted=s.duplicates_planted))
+        for m in s.missed:
+            print(f"  - {m}")
+        return 0
+
+    try:
+        result = run_compare(folder)
+    except FileNotFoundError:
+        print(t("cli.compare.nogroups", path=folder))
+        return 1
+    titles = {p.id: p.title for p in read_pages(folder)}
+    labels = {g["id"]: g["label"] for g in json.loads((folder / "groups.json").read_text("utf-8"))["groups"]}
+
+    def names(ids: list[str]) -> str:
+        return ", ".join(f"{titles.get(i, i)} [{i}]" for i in ids)
+
+    for g in result.groups:
+        if not g.findings:
+            continue
+        ref = names([g.reference]) if g.reference else "—"
+        print(t("cli.compare.group", label=labels.get(g.group, g.group), count=len(g.findings), reference=ref))
+        for f in g.findings:
+            print(_finding_line(f, names))
+    for f in result.shared_images:
+        print(t("cli.compare.shared_image", pages=names(f.pages)))
+    found = result.findings()
+    kinds = [f.kind for f in found]
+    print(t("cli.compare.done", groups=len(result.groups), conflicts=kinds.count("value_conflict"),
+            steps=sum(kinds.count(k) for k in ("missing_step", "extra_step", "reordered")),
+            duplicates=kinds.count("duplicate"), stale=kinds.count("stale")))
+    return 0
+
+
+def _finding_line(f, names) -> str:
+    d = f.details
+    if f.kind == "value_conflict":
+        values = " · ".join(f"{v or '—'} [{p}]" for p, v in d["values"].items())
+        return t("cli.compare.value_conflict", values=values)
+    if f.kind in ("missing_step", "extra_step"):
+        return t(f"cli.compare.{f.kind}", pages=names(f.pages), text=d["text"])
+    if f.kind == "reordered":
+        return t("cli.compare.reordered", page=names([d["page"]]), text=" / ".join(d["texts"]))
+    if f.kind == "duplicate":
+        return t("cli.compare.duplicate", similarity=d["similarity"], pages=names(f.pages))
+    reasons = []
+    for r in d["reasons"]:
+        if r["reason"] == "marker":
+            reasons.append(t("cli.compare.reason.marker", value=", ".join(r["markers"])))
+        elif r["reason"] == "old":
+            reasons.append(t("cli.compare.reason.old", days=r["days_older"]))
+        else:
+            reasons.append(t(f"cli.compare.reason.{r['reason']}", value=r["value"], other=r.get("other", "")))
+    return t("cli.compare.stale", page=names(f.pages), reasons="; ".join(reasons))
 
 
 if __name__ == "__main__":

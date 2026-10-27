@@ -16,6 +16,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Grupare: `python -m docaudit group DIR [--threshold 0.6] [--semantic] [--scan]` → `DIR/groups.json`
 - Corecturi: `python -m docaudit group-merge DIR A B` · `python -m docaudit group-detach DIR PAGINA` → `DIR/group_overrides.json`
 - Evaluare pe eșantion: `python -m docaudit group-eval DIR` (precizie, acoperire, F1 pe perechi)
+- Comparare: `python -m docaudit compare DIR` (după `group`) → `DIR/findings.json`; evaluare: `python -m docaudit compare-eval DIR`
 - Asemănare după sens (opțional): `pip install -e .[semantic]` + modelul descărcat o dată; rulează offline
 - Pe Windows: `Install.bat` (venv în `%LOCALAPPDATA%\DocAudit`, fără admin; `Install.bat semantic` cu modelul), apoi `DocAudit.bat <comandă>`. Pașii de instalare și test: `docs/INSTALARE.md`
 - Planificat (Etapa 8): `pythonw -m docaudit` (tray + UI)
@@ -30,7 +31,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/i18n.py` + `docaudit/locales/{ro,en,de}.json` — texte vizibile
 - `docaudit/lang.py` — limba paginii (ro/en/de) și expresiile de „pagină învechită” în cele trei limbi
 - `Install.bat`, `DocAudit.bat` — instalare fără admin și rulare pe Windows (CRLF, fără diacritice)
-- `docaudit/__main__.py` — CLI (`sample`, `validate`, `tree`, `extract`, `profile`, `import-files`, `make-test-notebook`, `check-sample`)
+- `docaudit/__main__.py` — CLI (`sample`, `validate`, `tree`, `extract`, `profile`, `import-files`, `make-test-notebook`, `check-sample`, `group*`, `compare`, `compare-eval`, `download-model`)
 - `docaudit/extract/onenote_xml.py` — XML OneNote 2013 (ierarhie, pagină) → Page; `render_*` pentru teste și notebook-ul de test
 - `docaudit/extract/com.py` — `ReadOnlyOneNote`: doar GetHierarchy și GetPageContent
 - `docaudit/extract/run.py` — extragere cu selecție, incremental după data modificării, cache de imagini
@@ -45,7 +46,10 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/group/overrides.py`, `run.py`, `evaluate.py`, `semantic.py` — corecturi, rulare + `groups.json`, F1, embeddings locale
 - `tests/fixtures/onenote/` — XML OneNote scris de mână (ierarhie cu Coș și grupuri, pagină cu liste, tabel, imagini, OCR)
 - `tests/fixtures/sample_v1/` — eșantionul generat (verificat byte cu byte față de generator)
-- Planificat: `docaudit/{compare,report,decisions,apply,ui}/`
+- `docaudit/compare/steps.py` — pașii paginii, valorile (cifre, căi, adrese, coduri) mascate cu `<v>`, alinierea pașilor între pagini
+- `docaudit/compare/analyze.py` — pe grup: conflicte de valori, pași lipsă / în plus / în altă ordine, duplicate, pagini învechite (semne RO/EN/DE, versiune mai mică, valoare veche, dată), pagina sugerată ca referință
+- `docaudit/compare/run.py`, `evaluate.py` — rulare + `findings.json`, scoruri pe eșantion
+- Planificat: `docaudit/{report,decisions,apply,ui}/`
 
 ## Reguli ale proiectului
 - **Nimic nu pleacă de pe calculator**: procesarea rulează local; fără apeluri de rețea în timpul analizei (test automat cu socket blocat). Serverul UI ascultă doar pe 127.0.0.1. Modelele (embeddings, OCR, LLM local) sunt opționale, descărcate o singură dată, rulate offline.
@@ -57,9 +61,9 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Datele extrase stau implicit în `%LOCALAPPDATA%\DocAudit\data` (`data_dir()`), niciodată în clona din Google Drive. Un nume simplu dat la `--out` sau ca folder ajunge tot acolo (`resolve_folder()`).
 - Eșantionul nu are voie să dea indicii despre răspuns în id-uri sau în `source.ref`; dacă schimbi generatorul, regenerează fixture-ul (`python -m docaudit sample`) în același commit.
 - Extragerea nu scrie în OneNote: `ReadOnlyOneNote` are doar cele două metode de citire (test automat). Codul care scrie (notebook de test, apoi Etapa 7) stă în module separate.
-- Gruparea nu modifică paginile extrase; scrie doar `groups.json`. Corecturile utilizatorului (`group_overrides.json`) au prioritate față de scoruri și se păstrează între rulări.
+- Gruparea nu modifică paginile extrase; scrie doar `groups.json`. Compararea scrie doar `findings.json`; constatările sunt sugestii, nu se aplică singure. Corecturile utilizatorului (`group_overrides.json`) au prioritate față de scoruri și se păstrează între rulări.
 - Imaginile se salvează ca `images/<sha256>.<ext>`; folosește `model.image_path()` ca să le găsești.
 - Formatul de intrare are câmp `schema_version`; orice schimbare a lui = versiune nouă + migrare + notă în CHANGELOG.
 
 ## Stare
-- v0.0.4 — Etapa 4 (grupare) făcută: F1 1.00 pe eșantion, dar eșantionul e mai ușor decât datele reale (pragul se calibrează pe date reale). Etapa 3 (extragere) testată cu XML OneNote scris de mână și cu eșantionul. **Netestat pe OneNote real**: apelurile COM și notebook-ul de test (pașii în `docs/INSTALARE.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).
+- v0.0.6 — Etapa 5 (comparare) făcută: pe eșantion 20/20 conflicte, 0 alarme false, 10/10 pagini învechite, 6/6 diferențe de pași, 5/5 duplicate; eșantionul e mai ușor decât datele reale. Etapele 1–4 sunt pe `main`. Paginile în altă limbă decât restul grupului nu se compară pas cu pas. **Netestat pe OneNote real**: apelurile COM, `Install.bat` și notebook-ul de test (pașii în `docs/INSTALARE.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).
