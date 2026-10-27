@@ -1,6 +1,6 @@
 # DocAudit — Plan Etapa 1
 
-Status: **propus, așteaptă „da”**. Fără cod în această etapă.
+Status: **aprobat (27.10.2026)**. Etapa 2 în lucru.
 
 ## 1. Pe scurt
 

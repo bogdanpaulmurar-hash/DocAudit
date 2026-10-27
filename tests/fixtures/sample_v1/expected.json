@@ -1,0 +1,538 @@
+{
+  "schema_version": 1,
+  "seed": 20261027,
+  "page_count": 80,
+  "groups": [
+    {
+      "key": "vpn",
+      "title": "Instalare client VPN",
+      "pages": [
+        "sample-p023",
+        "sample-p026",
+        "sample-p052",
+        "sample-p072",
+        "sample-p078"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "parola",
+      "title": "Resetare parolă cont de domeniu",
+      "pages": [
+        "sample-p029",
+        "sample-p031",
+        "sample-p066",
+        "sample-p074",
+        "sample-p080"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "imprimanta",
+      "title": "Adăugare imprimantă de rețea",
+      "pages": [
+        "sample-p012",
+        "sample-p016",
+        "sample-p044",
+        "sample-p076",
+        "sample-p077"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "backup",
+      "title": "Backup zilnic al bazei de date de test",
+      "pages": [
+        "sample-p002",
+        "sample-p028",
+        "sample-p035",
+        "sample-p036",
+        "sample-p057"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "cont_nou",
+      "title": "Creare cont utilizator nou",
+      "pages": [
+        "sample-p015",
+        "sample-p047",
+        "sample-p059",
+        "sample-p064"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "certificat",
+      "title": "Reînnoire certificat SSL pentru serverul web",
+      "pages": [
+        "sample-p010",
+        "sample-p021",
+        "sample-p032"
+      ],
+      "translation_pages": [
+        "sample-p027"
+      ]
+    },
+    {
+      "key": "email_mobil",
+      "title": "Configurare e-mail pe telefon",
+      "pages": [
+        "sample-p042",
+        "sample-p065",
+        "sample-p069"
+      ],
+      "translation_pages": [
+        "sample-p019"
+      ]
+    },
+    {
+      "key": "concediu",
+      "title": "Solicitare concediu de odihnă",
+      "pages": [
+        "sample-p001",
+        "sample-p018",
+        "sample-p039"
+      ],
+      "translation_pages": [
+        "sample-p008"
+      ]
+    },
+    {
+      "key": "predare_laptop",
+      "title": "Predare laptop la plecarea din firmă",
+      "pages": [
+        "sample-p003",
+        "sample-p009",
+        "sample-p049"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "incident",
+      "title": "Raportare incident de securitate",
+      "pages": [
+        "sample-p054",
+        "sample-p058",
+        "sample-p073"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "software",
+      "title": "Instalare aplicație din catalogul intern",
+      "pages": [
+        "sample-p022",
+        "sample-p056",
+        "sample-p063"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "parcare",
+      "title": "Solicitare card de acces în parcare",
+      "pages": [
+        "sample-p011",
+        "sample-p071",
+        "sample-p079"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "sedinta",
+      "title": "Programare ședință online",
+      "pages": [
+        "sample-p024",
+        "sample-p053",
+        "sample-p075"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "arhivare_mail",
+      "title": "Arhivare e-mailuri vechi",
+      "pages": [
+        "sample-p014",
+        "sample-p037"
+      ],
+      "translation_pages": []
+    },
+    {
+      "key": "periferic",
+      "title": "Înlocuire monitor sau periferic defect",
+      "pages": [
+        "sample-p062",
+        "sample-p068"
+      ],
+      "translation_pages": []
+    }
+  ],
+  "conflicts": [
+    {
+      "group": "vpn",
+      "slot": "port",
+      "values": {
+        "sample-p023": "443",
+        "sample-p026": "8443",
+        "sample-p052": "443",
+        "sample-p072": "443",
+        "sample-p078": "443"
+      }
+    },
+    {
+      "group": "vpn",
+      "slot": "ver",
+      "values": {
+        "sample-p023": "5.2",
+        "sample-p026": "5.2",
+        "sample-p052": "5.2",
+        "sample-p072": "4.1",
+        "sample-p078": "5.2"
+      }
+    },
+    {
+      "group": "parola",
+      "slot": "days",
+      "values": {
+        "sample-p029": "90",
+        "sample-p031": "60",
+        "sample-p066": "90",
+        "sample-p074": "90",
+        "sample-p080": "90"
+      }
+    },
+    {
+      "group": "parola",
+      "slot": "minlen",
+      "values": {
+        "sample-p029": "14",
+        "sample-p031": "12",
+        "sample-p066": "12",
+        "sample-p074": "12",
+        "sample-p080": "12"
+      }
+    },
+    {
+      "group": "imprimanta",
+      "slot": "driver",
+      "values": {
+        "sample-p012": "PCL6 v3.4",
+        "sample-p016": "PCL5 v1.9",
+        "sample-p044": "PCL6 v3.4",
+        "sample-p076": "PCL6 v3.4",
+        "sample-p077": "PCL6 v3.4"
+      }
+    },
+    {
+      "group": "imprimanta",
+      "slot": "path",
+      "values": {
+        "sample-p012": "\\\\print02.example.test\\Etaj2",
+        "sample-p016": "\\\\print01.example.test\\Etaj2",
+        "sample-p044": "\\\\print01.example.test\\Etaj2",
+        "sample-p076": "\\\\print01.example.test\\Etaj2",
+        "sample-p077": "\\\\print01.example.test\\Etaj2"
+      }
+    },
+    {
+      "group": "backup",
+      "slot": "path",
+      "values": {
+        "sample-p002": "D:\\Backup\\Zilnic",
+        "sample-p028": "D:\\Backup\\Zilnic",
+        "sample-p035": "D:\\Backup\\Zilnic",
+        "sample-p036": "E:\\Backup",
+        "sample-p057": "D:\\Backup\\Zilnic"
+      }
+    },
+    {
+      "group": "backup",
+      "slot": "script",
+      "values": {
+        "sample-p002": "backup_v2.ps1",
+        "sample-p028": "backup_v2.ps1",
+        "sample-p035": "backup_v2.ps1",
+        "sample-p036": "backup_v2.ps1",
+        "sample-p057": "backup_v1.bat"
+      }
+    },
+    {
+      "group": "cont_nou",
+      "slot": "group",
+      "values": {
+        "sample-p015": "GRP-Standard",
+        "sample-p047": "GRP-Standard",
+        "sample-p059": "GRP-Users",
+        "sample-p064": "GRP-Standard"
+      }
+    },
+    {
+      "group": "cont_nou",
+      "slot": "quota",
+      "values": {
+        "sample-p015": "100",
+        "sample-p047": "50",
+        "sample-p059": "50",
+        "sample-p064": "50"
+      }
+    },
+    {
+      "group": "certificat",
+      "slot": "cmd",
+      "values": {
+        "sample-p010": "openssl x509 -noout -enddate -in server.crt",
+        "sample-p021": "openssl x509 -noout -enddate -in server.crt",
+        "sample-p027": "openssl x509 -noout -enddate -in server.crt",
+        "sample-p032": "certutil -dump server.crt"
+      }
+    },
+    {
+      "group": "certificat",
+      "slot": "keylen",
+      "values": {
+        "sample-p010": "4096",
+        "sample-p021": "2048",
+        "sample-p027": "2048",
+        "sample-p032": "2048"
+      }
+    },
+    {
+      "group": "email_mobil",
+      "slot": "host",
+      "values": {
+        "sample-p019": "mail.example.test",
+        "sample-p042": "mail.example.test",
+        "sample-p065": "mail-old.example.test",
+        "sample-p069": "mail.example.test"
+      }
+    },
+    {
+      "group": "email_mobil",
+      "slot": "pin",
+      "values": {
+        "sample-p019": "6",
+        "sample-p042": "6",
+        "sample-p065": "6",
+        "sample-p069": "4"
+      }
+    },
+    {
+      "group": "concediu",
+      "slot": "notice",
+      "values": {
+        "sample-p001": "5",
+        "sample-p008": "5",
+        "sample-p018": "10",
+        "sample-p039": "5"
+      }
+    },
+    {
+      "group": "predare_laptop",
+      "slot": "form",
+      "values": {
+        "sample-p003": "F-12",
+        "sample-p009": "F-27",
+        "sample-p049": "F-27"
+      }
+    },
+    {
+      "group": "predare_laptop",
+      "slot": "room",
+      "values": {
+        "sample-p003": "104",
+        "sample-p009": "104",
+        "sample-p049": "210"
+      }
+    },
+    {
+      "group": "incident",
+      "slot": "phone",
+      "values": {
+        "sample-p054": "5555",
+        "sample-p058": "5555",
+        "sample-p073": "5000"
+      }
+    },
+    {
+      "group": "software",
+      "slot": "minutes",
+      "values": {
+        "sample-p022": "20",
+        "sample-p056": "10",
+        "sample-p063": "10"
+      }
+    },
+    {
+      "group": "parcare",
+      "slot": "level",
+      "values": {
+        "sample-p011": "-1",
+        "sample-p071": "-1",
+        "sample-p079": "-2"
+      }
+    }
+  ],
+  "step_diffs": [
+    {
+      "group": "parcare",
+      "page": "sample-p011",
+      "kind": "reordered",
+      "steps": [
+        1,
+        2
+      ]
+    },
+    {
+      "group": "sedinta",
+      "page": "sample-p024",
+      "kind": "missing_step",
+      "steps": [
+        2
+      ]
+    },
+    {
+      "group": "arhivare_mail",
+      "page": "sample-p037",
+      "kind": "reordered",
+      "steps": [
+        1,
+        2
+      ]
+    },
+    {
+      "group": "incident",
+      "page": "sample-p054",
+      "kind": "missing_step",
+      "steps": [
+        2
+      ]
+    },
+    {
+      "group": "software",
+      "page": "sample-p056",
+      "kind": "reordered",
+      "steps": [
+        1,
+        2
+      ]
+    },
+    {
+      "group": "periferic",
+      "page": "sample-p068",
+      "kind": "missing_step",
+      "steps": [
+        2
+      ]
+    }
+  ],
+  "stale": [
+    "sample-p001",
+    "sample-p003",
+    "sample-p016",
+    "sample-p031",
+    "sample-p032",
+    "sample-p054",
+    "sample-p057",
+    "sample-p059",
+    "sample-p065",
+    "sample-p072"
+  ],
+  "duplicates": [
+    [
+      "sample-p002",
+      "sample-p035"
+    ],
+    [
+      "sample-p023",
+      "sample-p052"
+    ],
+    [
+      "sample-p044",
+      "sample-p076"
+    ],
+    [
+      "sample-p047",
+      "sample-p064"
+    ],
+    [
+      "sample-p066",
+      "sample-p080"
+    ]
+  ],
+  "translations": [
+    [
+      "sample-p021",
+      "sample-p027"
+    ],
+    [
+      "sample-p039",
+      "sample-p008"
+    ],
+    [
+      "sample-p042",
+      "sample-p019"
+    ]
+  ],
+  "distractors": [
+    "sample-p013",
+    "sample-p020",
+    "sample-p038",
+    "sample-p043",
+    "sample-p045",
+    "sample-p046",
+    "sample-p055",
+    "sample-p060",
+    "sample-p061",
+    "sample-p067"
+  ],
+  "ungrouped": [
+    "sample-p004",
+    "sample-p005",
+    "sample-p006",
+    "sample-p007",
+    "sample-p013",
+    "sample-p017",
+    "sample-p020",
+    "sample-p025",
+    "sample-p030",
+    "sample-p033",
+    "sample-p034",
+    "sample-p038",
+    "sample-p040",
+    "sample-p041",
+    "sample-p043",
+    "sample-p045",
+    "sample-p046",
+    "sample-p048",
+    "sample-p050",
+    "sample-p051",
+    "sample-p055",
+    "sample-p060",
+    "sample-p061",
+    "sample-p067",
+    "sample-p070"
+  ],
+  "image_duplicates": {
+    "70e0908a8b3d238c6996876007c1a3be6994ef165aa89277d9ae68987917df77": [
+      "sample-p023",
+      "sample-p026"
+    ],
+    "7d7be371e266f57f9b4025d2a1c1ee26da0025320e7db7fa7c300cb3ecdda1bd": [
+      "sample-p038",
+      "sample-p044"
+    ],
+    "abfb5c07767f2c26e5b6787adcc8c5d1283d30f7bc92483e0aa16b95efb6929f": [
+      "sample-p007",
+      "sample-p047"
+    ]
+  },
+  "targets": {
+    "grouping_pairwise_f1_min": 0.85,
+    "grouping_pairwise_f1_min_with_embeddings": 0.9,
+    "conflict_recall_min": 0.8,
+    "conflict_false_alarm_max": 0.1,
+    "stale_found_min": 8,
+    "max_seconds_cpu": 60,
+    "max_seconds_cpu_without_embeddings": 15
+  }
+}

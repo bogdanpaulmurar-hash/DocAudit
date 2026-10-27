@@ -1,0 +1,48 @@
+{
+  "source": {
+    "kind": "sample",
+    "ref": "docaudit.sample seed=20261027"
+  },
+  "extracted_at": "2026-10-27T12:00:00Z",
+  "notebooks": [
+    {
+      "name": "Operațiuni",
+      "sections": [
+        "Administrativ",
+        "Facilități",
+        "Note",
+        "Resurse umane"
+      ]
+    },
+    {
+      "name": "Proceduri IT",
+      "sections": [
+        "Conturi",
+        "Hardware",
+        "Rețea",
+        "Securitate",
+        "Software"
+      ]
+    },
+    {
+      "name": "Suport Clienți",
+      "sections": [
+        "Diverse",
+        "Ghiduri",
+        "Întrebări frecvente"
+      ]
+    }
+  ],
+  "selection": {
+    "notebooks": [
+      "Operațiuni",
+      "Proceduri IT",
+      "Suport Clienți"
+    ],
+    "sections": [],
+    "pages": []
+  },
+  "page_count": 80,
+  "schema_version": 1,
+  "note": "Eșantion fictiv generat automat. Nu conține date reale."
+}

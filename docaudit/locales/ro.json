@@ -1,0 +1,10 @@
+{
+  "cli.description": "DocAudit — verificator local de documentație OneNote",
+  "cli.sample.help": "Generează eșantionul fictiv de test",
+  "cli.sample.out": "Folderul în care se scrie eșantionul",
+  "cli.sample.done": "Eșantion generat: {pages} pagini în {path}",
+  "cli.validate.help": "Verifică un folder în formatul normalizat",
+  "cli.validate.ok": "Format valid: {pages} pagini, schema v{schema}",
+  "cli.validate.errors": "{count} probleme găsite:",
+  "cli.version": "DocAudit {version}"
+}

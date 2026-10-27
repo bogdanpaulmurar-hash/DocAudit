@@ -1,0 +1,10 @@
+{
+  "cli.description": "DocAudit — local OneNote documentation checker",
+  "cli.sample.help": "Generate the fictional test sample",
+  "cli.sample.out": "Folder to write the sample to",
+  "cli.sample.done": "Sample generated: {pages} pages in {path}",
+  "cli.validate.help": "Check a folder in the normalized format",
+  "cli.validate.ok": "Valid format: {pages} pages, schema v{schema}",
+  "cli.validate.errors": "{count} problems found:",
+  "cli.version": "DocAudit {version}"
+}
