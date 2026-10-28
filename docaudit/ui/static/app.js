@@ -134,7 +134,36 @@ async function openTab(tab) {
   await guard(async () => {
     const render = { source: viewSource, analysis: viewAnalysis, groups: viewGroups, apply: viewApply,
                      journal: viewJournal, settings: viewSettings }[tab];
-    view.replaceChildren(await render());
+    view.replaceChildren(guide(tab), await render());
+  });
+}
+
+// Pașii „Cum fac?” de pe fiecare ecran. Deschiși până când îi închizi (ținut minte în browser).
+function guide(tab) {
+  const key = "docaudit.guide." + tab;
+  let open = true;
+  try { open = localStorage.getItem(key) !== "closed"; } catch (e) { /* fără stocare: deschis */ }
+  const box = h("details", { class: "card guide", open },
+    h("summary", {}, h("strong", { text: t("ui.guide.title") })),
+    h("ol", {}, t("ui.guide." + tab).split("\n").map(step => h("li", { text: step }))));
+  box.addEventListener("toggle", () => {
+    try { localStorage.setItem(key, box.open ? "open" : "closed"); } catch (e) { /* ignorat */ }
+  });
+  return box;
+}
+
+// „Verifică legătura cu OneNote”: fiecare pas cu ✓ / ✗ și ce e de făcut la cel care pică.
+async function runDiagnose(box, demo) {
+  box.replaceChildren(h("p", { class: "muted", text: t("ui.loading") }));
+  await guard(async () => {
+    const r = await api("/api/diagnose" + q({ demo: demo ? "1" : "0" }));
+    const allOk = r.checks.every(c => c.ok);
+    box.replaceChildren(h("div", { class: "notice" + (allOk ? "" : " err") },
+      h("p", {}, h("strong", { text: t(allOk ? "ui.diag.ok" : "ui.diag.fail") })),
+      h("ul", { class: "checks" }, r.checks.map(c => h("li", {},
+        h("span", { class: "mark", text: c.ok === true ? "✓" : c.ok === false ? "✗" : "–" }), " ",
+        h("strong", { text: t("diag." + c.key) }), c.detail ? h("span", { class: "muted", text: " · " + c.detail }) : null,
+        c.ok === false ? h("div", { class: "fix", text: t("diag." + c.key + ".fix") }) : null)))));
   });
 }
 
@@ -164,6 +193,7 @@ async function viewSource() {
   const out = h("div", { class: "muted" });
   demo.onchange = () => { if (demo.checked && name.value === "onenote") name.value = "demo"; };
 
+  const diagBox = h("div", {});
   const link = h("input", { type: "text", placeholder: t("ui.source.link.placeholder"), size: 48 });
   const linkOut = h("div", { class: "small" });
 
@@ -176,7 +206,8 @@ async function viewSource() {
       S.tree = null;
       treeBox.replaceChildren(h("div", { class: "notice err" },
         h("p", {}, h("strong", { text: t("ui.source.treefail") })), h("p", { text: e.message }),
-        h("p", { class: "small", text: t("ui.source.treehelp") })));
+        h("p", { class: "small", text: t("ui.source.treehelp") }),
+        h("button", { onclick: () => runDiagnose(diagBox, demo.checked), text: t("ui.diag.run") })));
       return false;
     }
     treeBox.replaceChildren(S.tree.notebooks.length ? renderTree(S.tree)
@@ -246,7 +277,9 @@ async function viewSource() {
     h("div", { class: "card stack" }, h("h1", { text: t("ui.source.title") }), h("p", { class: "muted", text: t("ui.source.help") }),
       h("div", { class: "row" },
         h("label", {}, demo, " ", t("ui.source.demo")),
-        h("button", { onclick: loadTree, text: t("ui.source.tree") })),
+        h("button", { onclick: loadTree, text: t("ui.source.tree") }),
+        h("button", { onclick: () => runDiagnose(diagBox, demo.checked), text: t("ui.diag.run") })),
+      diagBox,
       treeBox,
       h("div", { class: "stack" },
         h("div", { class: "row" },

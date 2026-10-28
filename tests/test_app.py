@@ -294,6 +294,8 @@ def test_server_extract_demo(server, tmp_path):
     missing = _req(server, "POST", "/api/link", {"demo": True, "link": link.replace("Proceduri%20IT", "Altul")})[1]
     assert not missing["found"] and missing["open_url"].startswith("onenote:https://exemplu.sharepoint.com/")
     assert _req(server, "POST", "/api/link", {"demo": True, "link": "javascript:alert(1)"})[0] == 400
+    checks = _req(server, "GET", "/api/diagnose?demo=1")[1]["checks"]
+    assert [c["ok"] for c in checks] == [True, True]
 
 
 # ---------- iconița ----------

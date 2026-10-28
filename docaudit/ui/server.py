@@ -51,8 +51,8 @@ def _dataset(name: str | None) -> Path:
 
 
 def _ui_texts(lang: str) -> dict[str, str]:
-    base = {k: v for k, v in _load("ro").items() if k.startswith(("ui.", "cli.compare.", "apply."))}
-    base.update({k: v for k, v in _load(lang).items() if k.startswith(("ui.", "cli.compare.", "apply."))})
+    base = {k: v for k, v in _load("ro").items() if k.startswith(("ui.", "cli.compare.", "apply.", "diag."))}
+    base.update({k: v for k, v in _load(lang).items() if k.startswith(("ui.", "cli.compare.", "apply.", "diag."))})
     return base
 
 
@@ -117,6 +117,19 @@ def api_tree(q: dict) -> dict:
     return {"notebooks": [{"name": nb.name, "location": nb.location, "sections": [
         {"path": "/".join(s.path), "pages": [{"id": p.id, "title": p.title, "modified": p.modified} for p in s.pages]}
         for s in nb.sections]} for nb in h.notebooks]}
+
+
+def api_diagnose(q: dict) -> dict:
+    """Verifică pe rând legătura cu OneNote (doar citire)."""
+    from ..extract.diagnose import diagnose
+
+    if q.get("demo") == "1":
+        from ..extract.demo import DemoOneNote
+
+        checks = diagnose(DemoOneNote, windows_checks=False)
+    else:
+        checks = diagnose()
+    return {"checks": [c.to_dict() for c in checks]}
 
 
 def api_link(body: dict) -> dict:
@@ -274,7 +287,8 @@ def api_settings(body: dict) -> dict:
 
 
 GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_state, "/api/page": api_page,
-              "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied}
+              "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied,
+              "/api/diagnose": api_diagnose}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,
                "/api/settings": api_settings, "/api/link": api_link}

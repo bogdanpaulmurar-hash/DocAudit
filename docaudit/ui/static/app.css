@@ -127,3 +127,10 @@ mark.diff { background: var(--mark-strong); }
 .notice { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 8px 12px; background: var(--panel); }
 .notice.err { border-left-color: var(--high); }
 a.button { display: inline-block; border: 1px solid var(--accent); padding: 6px 12px; border-radius: 8px; text-decoration: none; }
+.guide summary { cursor: pointer; }
+.guide ol { margin: 8px 0 0; padding-left: 22px; }
+.guide li { margin: 3px 0; }
+ul.checks { list-style: none; padding: 0; margin: 6px 0 0; }
+ul.checks li { margin: 4px 0; }
+ul.checks .mark { display: inline-block; width: 1.2em; font-weight: 700; }
+ul.checks .fix { margin: 2px 0 0 1.5em; }

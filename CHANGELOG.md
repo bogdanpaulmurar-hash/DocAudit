@@ -1,5 +1,12 @@
 # CHANGELOG — DocAudit
 
+## 0.1.3 — 2026-10-28
+- Nou: pașii „Cum fac?” sus pe fiecare ecran (Sursă, Analiză, Grupuri, De aplicat, Arhivă și jurnal, Setări), în RO / EN / DE. Sunt deschiși până îi închizi; browserul ține minte. Cerut de Bogdan: „nu am instrucțiuni”.
+- Nou: butonul „Verifică legătura cu OneNote” în Sursă (și în caseta de eroare). Verifică pe rând Windows, pywin32, OneNote desktop înregistrat, pornirea prin COM și notebook-urile deschise, cu ✓ / ✗ și ce e de făcut la primul ✗. Fără linie de comandă. Doar citire.
+- CLI: `diagnose [--demo]`, aceleași verificări în linia de comandă.
+- Teste: 121 trecute (`pytest -q`, Linux, Python 3.13).
+- Livrare: `git pull`, apoi din nou `Install.bat`.
+
 ## 0.1.2 — 2026-10-28
 - Reparat: în „Sursă” nu se putea alege niciun notebook. Eroarea de la OneNote apărea doar 7 secunde într-un mesaj jos, iar dacă OneNote desktop nu dădea niciun notebook, lista rămânea goală, fără explicație. Acum eroarea (sau lista goală) rămâne în pagină, cu ce e de verificat. Raportat de Bogdan.
 - Ierarhia și paginile se citesc și în schema XML OneNote 2010, nu doar 2013 (înainte ieșea o listă goală fără eroare).

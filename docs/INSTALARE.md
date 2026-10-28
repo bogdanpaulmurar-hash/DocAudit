@@ -24,6 +24,8 @@ DocAudit se folosește dintr-o interfață în browser, pornită din iconița de
 - Fără scurtătură: `DocAudit.bat ui` (oprești cu Ctrl+C).
 - Limba (RO / EN / DE) se schimbă din colțul dreapta sus. Butonul 🌓 schimbă tema luminoasă / întunecată.
 
+Fiecare ecran are sus „Cum fac?”, cu pașii lui.
+
 Ecranele:
 1. **Sursă**: bifezi notebook-urile, secțiunile sau paginile și apeși „Extrage”. „Arhivă” e exclusă implicit.
 2. **Analiză**: pragul de asemănare, cu tabelul „câte grupuri la fiecare prag”, apoi „Rulează analiza”.
@@ -70,7 +72,8 @@ DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în br
 1. În **Sursă**, lipește în „Link din browser (notebook de echipă)” adresa notebook-ului din OneNote pe web (bara browserului) sau din OneNote desktop (clic dreapta pe notebook → Copiază linkul) → „Găsește notebook-ul”.
    - Dacă e deschis în OneNote desktop, DocAudit îl bifează (sau secțiunea din link). Apasă „Extrage”.
    - Dacă nu e, apasă „Deschide în OneNote desktop”, așteaptă sincronizarea, apoi din nou „Găsește notebook-ul”. Dacă butonul lipsește (link scurt de partajare), în OneNote pe web alege „Deschide în aplicația desktop”.
-2. Dacă „Arată notebook-urile” dă o eroare, ea rămâne acum în pagină. Din linia de comandă: `DocAudit.bat tree` (lista, cu adresa fiecărui notebook) și `DocAudit.bat tree --link "<link>"`. Trimite-mi mesajul de eroare, nu conținutul paginilor.
+2. Dacă nu apare nimic sau apare o eroare, apasă **„Verifică legătura cu OneNote”** (în Sursă). Fiecare rând arată ✓ sau ✗, iar sub primul ✗ scrie ce ai de făcut. Rezolvă și apasă din nou. Trimite-mi textul rândurilor (se poate selecta și copia), nu conținutul paginilor.
+   - Același lucru din linia de comandă: `DocAudit.bat diagnose`. Lista notebook-urilor cu adresa lor: `DocAudit.bat tree`; un link anume: `DocAudit.bat tree --link "<link>"`.
 3. Fără COM (de exemplu blocat de IT): exportă paginile din OneNote ca .docx sau .mht și folosește `DocAudit.bat import-files <folder>`.
 
 ## 8. Limbă și curățenie
