@@ -1,5 +1,11 @@
 # CHANGELOG — DocAudit
 
+## 0.1.5 — 2026-10-28
+- Reparat: pe laptopul de lucru (1449 de pagini) extragerea se oprea la primele pagini cu „The RPC server is unavailable” (0x800706BA): OneNote se închidea sau se bloca la cererea unei pagini, iar DocAudit continua cu același obiect COM mort. Acum, când OneNote nu mai răspunde, DocAudit nu mai încearcă alte variante de parametri, se reconectează (pornește OneNote din nou) și reîncearcă pagina; dacă OneNote cade din nou la aceeași pagină, o cere fără imagini și notează asta în log. Când OneNote e doar ocupat (sincronizare), așteaptă și reîncearcă. Între pagini e o pauză de 50 ms, ca în scriptul vechi.
+- Reparat: copia logului din Google Drive rămânea la pornire, pentru că Drive nu urcă un fișier ținut deschis. Acum fiecare rând se scrie și fișierul se închide imediat (local și în Drive).
+- Teste: 134 trecute (`pytest -q`, Linux, Python 3.13), inclusiv OneNote care cade o dată (reconectare) și care cade doar cu imaginile (pagina fără imagini).
+- Livrare: `git pull`, apoi din nou `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.4 — 2026-10-28
 - Reparat: extragerea dădea **0 pagini** fără explicație (raportat de Bogdan pe laptopul de lucru, notebook de 700+ pagini). Cauza: cu legătura din biblioteca de tipuri OneNote (varianta din 0.1.3), parametrul de ieșire al lui `GetPageContent` nu se dă deloc, iar a doua încercare trimitea parametrii mutați, deci fiecare pagină pica. Acum fiecare apel COM încearcă variantele de parametri în ordinea corectă și o ține minte pe cea care merge (`extract/connect.py`, `ComCaller`).
 - Reparat: „De aplicat” arăta `TypeError: IApplication.GetHierarchy() takes from 1 to 4 positional arguments but 5 were given`. Scrierea folosește aceeași legătură; la scrieri se încearcă altă variantă doar când numărul de parametri e greșit, ca o scriere să nu se repete.
