@@ -29,6 +29,7 @@ from typing import Callable
 from .. import log
 from ..extract.connect import OneNoteGone
 from ..model import Page, image_path, read_manifest, read_pages
+from . import guide
 from .pdf import Item, merge, text_pdf
 from ..extract.psbridge import BridgeUnavailable
 from .publish import OfflinePublisher, Unsupported
@@ -66,6 +67,9 @@ class ExportResult:
     reupload: list[str] = field(default_factory=list)
     removed_docs: list[str] = field(default_factory=list)
     skipped_pdf: list[list[str]] = field(default_factory=list)
+    changes: dict = field(default_factory=dict)  # nou / modificat / mutat / scos față de exportul anterior
+    instructions: str = ""
+    instructions_changed: bool = False
     cancelled: bool = False
     seconds: float = 0.0
     finished_at: str = ""
@@ -331,13 +335,13 @@ def export(folder: Path, plan: BotPlan | None = None, *, out_dir: Path | None = 
                 _save(base / CACHE_FILE, cache)
             if progress:
                 progress(i, total)
+        _save(base / CACHE_FILE, cache)
+        if not result.cancelled:
+            _build_documents(folder, plan, result, cache, out_dir, max_mb, pages, ex)
     finally:
         ex.close()
         shutil.rmtree(tmp, ignore_errors=True)
         _save(base / CACHE_FILE, cache)
-
-    if not result.cancelled:
-        _build_documents(folder, plan, result, cache, out_dir, max_mb)
     result.seconds = round(time.monotonic() - t0, 1)
     result.finished_at = time.strftime("%Y-%m-%dT%H:%M:%S")
     counts = result.counts()
@@ -349,7 +353,7 @@ def export(folder: Path, plan: BotPlan | None = None, *, out_dir: Path | None = 
 
 
 def _build_documents(folder: Path, plan: BotPlan, result: ExportResult, cache: dict, out_dir: Path,
-                     max_mb: float) -> None:
+                     max_mb: float, pages: dict[str, Page], ex: "_Exporter | None" = None) -> None:
     base = bot_dir(folder)
     previous = _load(base / OUTPUTS_FILE)
     old_fp: dict[str, str] = previous.get("fingerprints", {}) if previous.get("out_dir") == str(out_dir) else {}
@@ -383,13 +387,106 @@ def _build_documents(folder: Path, plan: BotPlan, result: ExportResult, cache: d
         if old_fp.get(doc["name"]) != fingerprints[doc["name"]] or not set(names) <= old_files:
             result.reupload += names
         result.skipped_pdf += [list(s) for s in merged.skipped]
+    # cuprinsul (cu ce s-a schimbat) și instrucțiunile botului
+    same_dir = previous.get("out_dir") == str(out_dir)
+    exported = {pid for pid, r in by_page.items() if r.file and pid in cache}
+    current = guide.page_map(plan, pages, exported)
+    ch = guide.changes(previous.get("pages"), current)
+    result.changes = ch.to_dict()
+    when = time.strftime("%Y-%m-%d %H:%M")
+    # în cuprins rămân ultimele schimbări reale (cu data lor), ca un export fără noutăți să nu-l schimbe
+    shown, shown_when = ch, when
+    if not ch.first and not ch.count() and previous.get("last_changes"):
+        shown = guide.Changes(**{k: [tuple(x) for x in v] if isinstance(v, list) else v
+                                 for k, v in previous["last_changes"].items()})
+        shown_when = previous.get("last_changes_at", "")
+    files_by_doc: dict[str, list[str]] = {}
+    for f in result.files:
+        files_by_doc.setdefault(f["doc"], []).append(f["name"])
+    lines = guide.index_lines(plan, pages, files_by_doc, shown, exported, shown_when)
+    index_hash = guide.text_hash(lines)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    index_changed = index_hash != (previous.get("index_hash") if same_dir else None)
+    if index_changed or not (out_dir / guide.INDEX_FILE).is_file():
+        _index_pdf(out_dir / guide.INDEX_FILE, [f"Export: {when}", *lines], ex)
+    written.append(guide.INDEX_FILE)
+    if index_changed:
+        result.reupload.insert(0, guide.INDEX_FILE)
+    result.instructions = guide.instructions(plan, pages, files_by_doc, exported, when)
+    instructions_hash = guide.text_hash(guide.instructions(plan, pages, files_by_doc, exported, ""))
+    result.instructions_changed = instructions_hash != previous.get("instructions_hash")
+    (out_dir / guide.INSTRUCTIONS_FILE).write_text(result.instructions, encoding="utf-8")
+    written.append(guide.INSTRUCTIONS_FILE)
+    _append_history(bot_dir(folder), when, ch)
+
     # documentele care nu mai există (ex. toate paginile scoase): fișierele lor vechi pleacă
-    if previous.get("out_dir") == str(out_dir):
+    if same_dir:
         for name in previous.get("files", []):
             if name not in written:
                 (out_dir / name).unlink(missing_ok=True)
         result.removed_docs = sorted(set(old_fp) - set(fingerprints))
-    _save(base / OUTPUTS_FILE, {"out_dir": str(out_dir), "files": written, "fingerprints": fingerprints})
+    _save(base / OUTPUTS_FILE, {"out_dir": str(out_dir), "files": written, "fingerprints": fingerprints,
+                                "pages": current, "index_hash": index_hash, "instructions_hash": instructions_hash,
+                                "last_changes": shown.to_dict(), "last_changes_at": shown_when})
+
+
+def _index_pdf(dest: Path, lines: list[str], ex: "_Exporter | None") -> None:
+    """Cuprinsul prin Word, ca să păstreze diacriticele; fără Word, PDF-ul simplu (fără ă, ș, ț)."""
+    title = "Cuprins / Inhaltsverzeichnis"
+    if ex is not None and not ex.offline:
+        src = ex._fresh("html")
+        body = "".join(f"<p style='margin:0;white-space:pre-wrap'>{html.escape(line) or '&nbsp;'}</p>" for line in lines)
+        src.write_text(f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>{title}</title></head>"
+                       f"<body style='font-family:Segoe UI,Arial;font-size:10pt'><h1>{title}</h1>{body}</body></html>",
+                       encoding="utf-8")
+        pdf = ex._fresh("pdf")
+        try:
+            if ex.word(src, pdf):
+                shutil.move(str(pdf), dest)
+                return
+        except OneNoteGone:
+            pass
+    dest.write_bytes(text_pdf(title, lines))
+
+
+def _append_history(base: Path, when: str, ch: guide.Changes) -> None:
+    """Istoricul exporturilor (local, pentru tine): ce a intrat nou, ce s-a schimbat, ce s-a mutat."""
+    lines = [f"## {when}"]
+    if ch.first:
+        lines.append("- primul export")
+    else:
+        lines.append(f"- nou {len(ch.new)}, modificat {len(ch.modified)}, mutat {len(ch.moved)}, scos {len(ch.removed)}")
+        lines += [f"  - nou: {t} [{d}]" for t, d in ch.new]
+        lines += [f"  - modificat: {t} [{d}]" for t, d in ch.modified]
+        lines += [f"  - mutat: {t}: {a} -> {b}" for t, a, b in ch.moved]
+        lines += [f"  - scos: {t} [{d}]" for t, d in ch.removed]
+    with (base / "istoric_modificari.md").open("a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n\n")
+
+
+def foreign_files(folder: Path, out_dir: Path) -> list[str]:
+    """Fișierele din folderul documentelor pe care nu le-a scris DocAudit (de ex. de la scriptul vechi)."""
+    if not out_dir.is_dir():
+        return []
+    previous = _load(bot_dir(folder) / OUTPUTS_FILE)
+    ours = set(previous.get("files", [])) if previous.get("out_dir") == str(out_dir) else set()
+    ours |= {guide.INDEX_FILE, guide.INSTRUCTIONS_FILE}
+    return sorted((p.name for p in out_dir.iterdir() if p.is_file() and p.name not in ours
+                   and not p.name.startswith(("~$", "."))), key=str.casefold)
+
+
+def move_foreign(folder: Path, out_dir: Path, names: list[str]) -> Path | None:
+    """Mută fișierele străine într-un subfolder `_vechi_<dată>` (nu le șterge)."""
+    allowed = set(foreign_files(folder, out_dir))
+    picked = [n for n in names if n in allowed]
+    if not picked:
+        return None
+    target = out_dir / time.strftime("_vechi_%Y%m%d-%H%M%S")
+    target.mkdir(parents=True, exist_ok=True)
+    for name in picked:
+        shutil.move(str(out_dir / name), str(target / name))
+    _lg.info("Export pentru bot: %d fișiere vechi mutate în subfolder", len(picked))
+    return target
 
 
 def _write_reports(base: Path, result: ExportResult) -> None:

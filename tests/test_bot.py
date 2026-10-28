@@ -10,7 +10,8 @@ import pytest
 from pypdf import PdfReader
 
 from docaudit.bot import export as bot_export
-from docaudit.bot.export import ExportAborted, export, last_run
+from docaudit.bot.export import ExportAborted, export, foreign_files, last_run, move_foreign
+from docaudit.bot.guide import INDEX_FILE, INSTRUCTIONS_FILE
 from docaudit.bot.pdf import Item, merge, text_pdf
 from docaudit.bot.publish import FORMATS, SCRIPT
 from docaudit.bot.select import build_plan, content_key, safe_name, set_override
@@ -193,7 +194,13 @@ class FakePublisher:
         self.calls.append((src.suffix, "word"))
         if not self.word:
             raise RuntimeError("Word (PowerShell): 0x80040154 Class not registered")
-        dst.write_bytes(text_pdf(f"word {src.suffix}", ["y" * 80] * 10))
+        if src.suffix == ".html":  # „Word” fals: textul din HTML, ca să se poată verifica
+            import re
+
+            lines = [re.sub(r"<[^>]+>", "", x) for x in src.read_text("utf-8").split("</p>")]
+            dst.write_bytes(text_pdf("word", lines))
+        else:
+            dst.write_bytes(text_pdf(f"word {src.suffix}", ["y" * 80] * 10))
 
     def close(self):
         self.closed += 1
@@ -230,7 +237,7 @@ def test_export_fallback_steps(ds, tmp_path, fast):
         titles += [o.title for o in PdfReader(str(out / f["name"])).outline]
     exported = [p for p in r.pages if p.file]
     assert len(titles) == len(exported) == len(r.pages) - 1
-    assert sorted(r.reupload) == sorted(f["name"] for f in r.files)  # primul export: totul e nou
+    assert sorted(r.reupload) == sorted([INDEX_FILE] + [f["name"] for f in r.files])  # primul export: totul e nou
     assert (ds / "bot" / "export_pages.csv").is_file()
     assert last_run(ds)["counts"]["pdf"] == len(r.pages) - 4
 
@@ -253,7 +260,9 @@ def test_export_reuses_pages_and_lists_only_changed_documents(ds, tmp_path, fast
     pages = [dataclasses.replace(p, modified="2030-01-01T00:00:00Z") if p.id == changed else p for p in pages]
     write_dataset(ds, read_manifest(ds), pages)
     r3 = export(ds, build_plan(ds), out_dir=out, make_publisher=lambda: FakePublisher({}))
-    assert r3.reupload == [f"{plan.documents[0]['name']}.pdf"]
+    assert r3.reupload == [INDEX_FILE, f"{plan.documents[0]['name']}.pdf"]  # cuprinsul spune ce s-a schimbat
+    assert [t for t, _ in r3.changes["modified"]] == [next(p.title for p in pages if p.id == changed)]
+    assert not r3.instructions_changed
 
     # un document dispărut: fișierul lui vechi pleacă, al utilizatorului rămâne
     for pid in plan.documents[1]["pages"]:
@@ -353,8 +362,60 @@ def test_server_bot_endpoints(ds):
         status, r = _req(srv, "POST", "/api/bot/export", {"ds": ds.name, "wait": True})
         assert status == 200 and r["files"] and not r["cancelled"], r
         assert _req(srv, "GET", f"/api/bot/plan?ds={ds.name}")[1]["last"]["files"] == r["files"]
+        assert plan["foreign"] == []
+        status, mv = _req(srv, "POST", "/api/bot/move-foreign", {"ds": ds.name, "names": ["x.pdf"]})
+        assert status == 200 and mv["moved"] == 0
+        import sys
+
+        if sys.platform != "win32":
+            assert _req(srv, "POST", "/api/bot/pick-folder", {})[0] == 501
         status, o = _req(srv, "POST", "/api/bot/open", {"ds": ds.name})
         assert status == 200 and o["path"].endswith("out")
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# ---------- cuprins, instrucțiuni, fișierele vechi ----------
+
+def test_index_and_instructions_follow_changes(ds, tmp_path, fast):
+    out = tmp_path / "bot"
+    plan = build_plan(ds, level="section")
+    r1 = export(ds, plan, out_dir=out, make_publisher=lambda: FakePublisher({}))
+    assert r1.changes["first"] and (out / INDEX_FILE).is_file()
+    text = (out / INSTRUCTIONS_FILE).read_text("utf-8")
+    assert text == r1.instructions and r1.instructions_changed
+    assert "Romanian or German" in text and INDEX_FILE in text and plan.documents[0]["name"] in text
+    index = "".join(pg.extract_text() for pg in PdfReader(str(out / INDEX_FILE)).pages)
+    assert "Primul export" in index
+
+    # o pagină mutată (decizie „Mută…”) apare la „mutat”, ambele documente se reîncarcă
+    pages = read_pages(ds)
+    first_doc, other_doc = plan.documents[0], plan.documents[-1]
+    moved = first_doc["pages"][0]
+    target = next(p for p in pages if p.id == other_doc["pages"][0])
+    Journal(ds).add(moved, "move", target=make_target(target.notebook, "/".join(target.section_path)))
+    r2 = export(ds, build_plan(ds, level="section"), out_dir=out, make_publisher=lambda: FakePublisher({}))
+    assert [m[1:] for m in r2.changes["moved"]] == [(first_doc["name"], other_doc["name"])]
+    assert INDEX_FILE in r2.reupload and f"{other_doc['name']}.pdf" in r2.reupload
+    assert "Mutat" in "".join(pg.extract_text() for pg in PdfReader(str(out / INDEX_FILE)).pages)
+
+    # fără nimic nou: cuprinsul păstrează ultimele schimbări și nu cere reîncărcare
+    r3 = export(ds, build_plan(ds, level="section"), out_dir=out, make_publisher=lambda: FakePublisher({}))
+    assert r3.reupload == [] and not r3.instructions_changed
+    assert "istoric" in "".join(p.name for p in (ds / "bot").iterdir())
+
+
+def test_foreign_files_are_moved_aside_not_deleted(ds, tmp_path):
+    out = tmp_path / "BotDDB"
+    out.mkdir()
+    (out / "Operations.pdf").write_bytes(b"vechi")
+    (out / "Support_HOME_Part1.pdf").write_bytes(b"vechi")
+    assert foreign_files(ds, out) == ["Operations.pdf", "Support_HOME_Part1.pdf"]
+    export(ds, out_dir=out)
+    assert foreign_files(ds, out) == ["Operations.pdf", "Support_HOME_Part1.pdf"]  # ale DocAudit nu apar
+    assert move_foreign(ds, out, ["Operations.pdf", "nu-exista.pdf", "../x"]) is not None
+    assert foreign_files(ds, out) == ["Support_HOME_Part1.pdf"]
+    kept = next(out.glob("_vechi_*"))
+    assert (kept / "Operations.pdf").read_bytes() == b"vechi"
+    assert move_foreign(ds, out, []) is None

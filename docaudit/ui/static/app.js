@@ -732,6 +732,25 @@ async function viewBot() {
   }
   [level, skipStale, skipDup, maxMb, outDir].forEach(el => { el.onchange = saveOptions; });
 
+  async function pickFolder() {
+    await guard(async () => {
+      toast(t("ui.bot.pick.wait"));
+      const r = await api("/api/bot/pick-folder", {});
+      if (!r.path) return;
+      outDir.value = r.path;
+      await saveOptions();
+    });
+  }
+
+  async function moveForeign(names) {
+    if (!confirm(t("ui.bot.foreign.confirm", { count: names.length }))) return;
+    await guard(async () => {
+      const r = await api("/api/bot/move-foreign", { ds: S.ds, names });
+      toast(t("ui.bot.foreign.moved", { count: r.moved, path: r.to }));
+      await refresh();
+    });
+  }
+
   async function override(page, value) {
     await guard(async () => { await api("/api/bot/override", { ds: S.ds, page, value }); await refresh(); });
   }
@@ -760,7 +779,12 @@ async function viewBot() {
       c.untitled ? h("p", { class: "small notice", text: t("ui.bot.untitled.help", { count: c.untitled }) }) : null,
       !plan.compared && skipStale.checked ? h("p", { class: "small notice", text: t("ui.bot.nocompare") }) : null,
       plan.offline ? h("p", { class: "small notice", text: t("ui.bot.offline") }) : null,
-      h("p", { class: "small muted", text: t("ui.bot.where", { path: plan.out_dir }) })].filter(Boolean));
+      h("p", { class: "small muted", text: t("ui.bot.where", { path: plan.out_dir }) }),
+      plan.foreign.length ? h("div", { class: "notice" },
+        h("p", { text: t("ui.bot.foreign", { count: plan.foreign.length }) }),
+        h("details", {}, h("summary", { text: t("ui.bot.foreign.list") }),
+          h("ul", { class: "small" }, plan.foreign.map(n => h("li", { text: n })))),
+        h("button", { onclick: () => moveForeign(plan.foreign), text: t("ui.bot.foreign.move") })) : null].filter(Boolean));
     const byDoc = {};
     plan.pages.forEach(p => { if (p.included) (byDoc[p.doc] = byDoc[p.doc] || []).push(p); });
     const left = plan.pages.filter(p => !p.included);
@@ -792,6 +816,27 @@ async function viewBot() {
         }), text: t("ui.bot.open") })));
     const counts = Object.entries(r.counts || {}).map(([k, v]) => t("ui.bot.method." + k) + ": " + v).join(" · ");
     if (counts) parts.push(h("p", { class: "small", text: counts }));
+    const ch = r.changes || {};
+    if (ch.first) parts.push(h("p", { class: "small", text: t("ui.bot.changes.first") }));
+    else if (r.changes) {
+      const lists = [["new", ch.new || []], ["modified", ch.modified || []], ["moved", ch.moved || []], ["removed", ch.removed || []]];
+      parts.push(h("details", {},
+        h("summary", { text: t("ui.bot.changes", { new: lists[0][1].length, modified: lists[1][1].length,
+                                                    moved: lists[2][1].length, removed: lists[3][1].length }) }),
+        ...lists.filter(([, l]) => l.length).map(([k, l]) => h("div", {}, h("strong", { text: t("ui.bot.changes." + k) }),
+          h("ul", { class: "small" }, l.map(x => h("li", { text: x.length === 3 ? `${x[0]}: ${x[1]} → ${x[2]}` : `${x[0]} · ${x[1]}` })))))));
+    }
+    if (r.instructions) {
+      const area = h("textarea", { class: "instructions", readonly: true, rows: "14" });
+      area.value = r.instructions;
+      parts.push(h("details", { open: !!r.instructions_changed },
+        h("summary", {}, h("strong", { text: t("ui.bot.instructions") }), " ",
+          r.instructions_changed ? h("span", { class: "badge sev-medium", text: t("ui.bot.instructions.changed") }) : null),
+        h("p", { class: "small muted", text: t("ui.bot.instructions.help") }), area,
+        h("div", {}, h("button", { text: t("ui.bot.copy"), onclick: () => guard(async () => {
+          await navigator.clipboard.writeText(r.instructions); toast(t("ui.bot.copied"));
+        }) }))));
+    }
     parts.push(h("h2", { text: t("ui.bot.reupload", { count: (r.reupload || []).length }) }),
       (r.reupload || []).length ? h("ul", {}, r.reupload.map(n => h("li", { text: n })))
         : h("p", { class: "muted", text: t("ui.bot.reupload.none") }));
@@ -843,6 +888,7 @@ async function viewBot() {
       return;
     }
     renderResult(job.result, false);
+    await refresh();
     toast(t("ui.bot.done", { pages: (job.result.pages || []).length, files: (job.result.files || []).length,
                              seconds: Math.round(job.result.seconds || 0) }));
   }
@@ -855,7 +901,8 @@ async function viewBot() {
         h("label", {}, skipStale, " ", t("ui.bot.skip_stale")),
         h("label", {}, skipDup, " ", t("ui.bot.skip_duplicates")),
         h("label", {}, t("ui.bot.max_mb"), " ", maxMb)),
-      h("div", { class: "row" }, h("label", {}, t("ui.bot.out"), " ", outDir)),
+      h("div", { class: "row" }, h("label", {}, t("ui.bot.out"), " ", outDir),
+        h("button", { onclick: pickFolder, text: t("ui.bot.pick") })),
       h("p", { class: "small muted", text: t("ui.bot.out.help") }),
       summary,
       h("div", { class: "row" }, h("button", { class: "primary", onclick: run, text: t("ui.bot.run") }),
