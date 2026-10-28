@@ -65,12 +65,25 @@ def _source(demo: bool):
     return ReadOnlyOneNote(), "OneNote desktop (COM)"
 
 
+def _utf8_output() -> None:
+    """Pe Windows, ieșirea redirecționată (de ex. `>nul` în Install.bat) folosește cp1252 și nu poate scrie
+    diacritice românești (ă, ț, ș). Trecem pe UTF-8, iar un caracter imposibil devine „?”, nu o eroare."""
+    for stream in (sys.stdout, sys.stderr):
+        enc = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if enc != "utf8" and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):  # fluxul nu poate fi reconfigurat
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
     if sys.stdout is None:  # pythonw: fără consolă
         import io
         import os
 
         sys.stdout = sys.stderr = io.TextIOWrapper(open(os.devnull, "wb"), encoding="utf-8")  # noqa: SIM115
+    _utf8_output()
     if argv is None:
         argv = sys.argv[1:]
     if not argv:
