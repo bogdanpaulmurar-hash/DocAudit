@@ -86,3 +86,16 @@ def test_download_model_without_library(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake)
     assert main(["download-model"]) == 2
+
+
+def test_output_on_cp1252_console(monkeypatch, tmp_path):
+    """Install.bat rulează `make-icon … >nul`: pe Windows ieșirea e cp1252 și nu știe „ț” din „Iconiță”."""
+    import io
+    import sys
+
+    raw = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    monkeypatch.setenv("DOCAUDIT_LANG", "ro")
+    assert main(["make-icon", str(tmp_path / "i")]) == 0
+    sys.stdout.flush()
+    assert "Iconiță".encode("utf-8") in raw.getvalue()

@@ -4,6 +4,7 @@ rem Folosire: Install.bat            (instalare de baza)
 rem           Install.bat semantic   (plus asemanarea dupa sens; descarca modelul o singura data)
 chcp 65001 >nul
 setlocal
+set "PYTHONIOENCODING=utf-8"
 set "ROOT=%~dp0"
 set "APP=%LOCALAPPDATA%\DocAudit"
 set "VENV=%APP%\venv"

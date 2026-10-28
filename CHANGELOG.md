@@ -1,5 +1,10 @@
 # CHANGELOG — DocAudit
 
+## 0.1.1 — 2026-10-28
+- Reparat: `Install.bat` se oprea la „Creez iconita si scurtaturile” cu `UnicodeEncodeError` (cp1252). Pe Windows, ieșirea redirecționată nu putea scrie diacriticele din mesaje („Iconiță”). Acum DocAudit scrie mereu în UTF-8, iar `Install.bat` setează și `PYTHONIOENCODING=utf-8`. Găsit de Bogdan la prima instalare (Python 3.14).
+- Teste: 109 trecute.
+- Livrare: `git pull`, apoi din nou `Install.bat`.
+
 ## 0.1.0 — 2026-10-27
 - Etapa 6: interfață în browser, doar pe 127.0.0.1, cu șase ecrane: Sursă (bife pe notebook / secțiune / pagină), Analiză (prag cu tabel pe praguri), Grupuri (constatări + paginile una lângă alta, valorile diferite evidențiate, taste J/K, 1–9, R/O/A/I), De aplicat, Arhivă și jurnal, Setări. RO / EN / DE, temă luminoasă și întunecată.
 - Serverul folosește doar biblioteca standard Python, nu FastAPI, ca instalarea să nu depindă de pachete pe care IT-ul le-ar putea bloca. Protecții: verificarea Host, un jeton pe fiecare cerere /api/, CSP strict și niciun CORS. Textul paginilor intră în pagină doar ca text.
