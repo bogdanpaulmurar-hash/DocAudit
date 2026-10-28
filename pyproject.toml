@@ -12,7 +12,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 semantic = ["sentence-transformers>=2.2"]
-windows = ["pywin32>=306; sys_platform == 'win32'"]
+windows = ["pywin32>=306; sys_platform == 'win32'", "comtypes>=1.2; sys_platform == 'win32'"]
 tray = ["pystray>=0.19", "Pillow>=10"]
 
 [project.scripts]

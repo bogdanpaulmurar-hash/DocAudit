@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import secrets
+import sys
 import threading
 import webbrowser
 from http import HTTPStatus
@@ -299,7 +300,7 @@ WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore"}
 
 class Handler(BaseHTTPRequestHandler):
     server: "DocAuditServer"
-    server_version = "DocAudit"
+    server_version = f"DocAudit/{__version__}"
     sys_version = ""
 
     def log_message(self, fmt: str, *args: object) -> None:  # fără jurnal în consolă (pythonw)
@@ -371,6 +372,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": "ui.error.token"})
         if not self._token_ok({}):  # la POST jetonul vine doar în antet
             return self._json(403, {"error": "ui.error.token"})
+        if path == "/api/quit":  # o pornire nouă (altă versiune) îi cere celei vechi să se închidă
+            self._json(200, {"ok": True})
+            threading.Thread(target=self.server.quit, daemon=True).start()
+            return
         fn = POST_ROUTES.get(path)
         if fn is None:
             return self._json(404, {"error": "ui.error.notfound"})
@@ -429,12 +434,25 @@ class Handler(BaseHTTPRequestHandler):
 
 class DocAuditServer(ThreadingHTTPServer):
     daemon_threads = True
+    # Pe Windows SO_REUSEADDR lasă două servere pe același port: a doua pornire n-ar mai vedea prima.
+    allow_reuse_address = sys.platform != "win32"
 
     def __init__(self, host: str, port: int) -> None:
         if not is_loopback(host):
             raise ValueError(f"DocAudit ascultă doar local, nu pe {host}")
         self.token = secrets.token_urlsafe(24)
         super().__init__((host, port), Handler)
+
+        self.on_quit = None  # tray: oprește și iconița
+
+    def quit(self) -> None:
+        if self.on_quit is not None:
+            try:
+                self.on_quit()
+            except Exception:
+                pass
+        self.shutdown()
+        self.server_close()  # eliberează portul pentru pornirea nouă
 
     @property
     def url(self) -> str:

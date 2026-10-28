@@ -33,28 +33,17 @@ class ReadOnlyOneNote:
     def __init__(self) -> None:
         try:
             import pythoncom  # type: ignore[import-not-found]
-            import win32com.client  # type: ignore[import-not-found]
+            import win32com.client  # type: ignore[import-not-found]  # noqa: F401
         except ImportError as e:  # pragma: no cover - doar pe Windows
             raise OneNoteError("pywin32 lipsește (pip install pywin32) sau sistemul nu e Windows") from e
-        pythoncom.CoInitialize()
+        from .connect import ConnectError, connect
+
         self._missing = pythoncom.Missing
-        self._app = None
-        problems: list[str] = []
-        # gencache știe parametrii de ieșire ([out]) și îi întoarce ca rezultat. Unele instalări
-        # Microsoft 365 au înregistrată biblioteca de tipuri doar sub „OneNote.Application.12”.
-        for make, progid in ((win32com.client.gencache.EnsureDispatch, "OneNote.Application"),
-                             (win32com.client.gencache.EnsureDispatch, "OneNote.Application.12"),
-                             (win32com.client.Dispatch, "OneNote.Application")):
-            try:  # pragma: no cover - doar pe Windows
-                self._app = make(progid)
-                break
-            except AttributeError as e:  # pragma: no cover - cache gen_py stricat
-                problems.append(f"{progid}: {e} (șterge folderul %LOCALAPPDATA%\\Temp\\gen_py)")
-            except Exception as e:  # pragma: no cover - doar pe Windows
-                problems.append(f"{progid}: {e}")
-        if self._app is None:  # pragma: no cover - doar pe Windows
+        try:  # pragma: no cover - doar pe Windows
+            self._app, self._how, self._problems = connect()
+        except ConnectError as e:  # pragma: no cover - doar pe Windows
             raise OneNoteError("OneNote desktop nu răspunde prin COM (e instalat OneNote din Microsoft 365 / "
-                               "2016, nu doar „OneNote for Windows 10”?): " + "; ".join(problems))
+                               "2016, nu doar „OneNote for Windows 10”?): " + str(e)) from e
 
     def get_hierarchy_xml(self) -> str:  # pragma: no cover - doar pe Windows
         return self._call("GetHierarchy", ("", HS_PAGES, self._missing, XS_2013), ("", HS_PAGES))
@@ -64,11 +53,10 @@ class ReadOnlyOneNote:
                           (page_id, self._missing, PI_BINARY_DATA))
 
     def _call(self, method: str, args: tuple, fallback: tuple) -> str:  # pragma: no cover
-        fn = getattr(self._app, method)
         last: Exception | None = None
         for a in (args, fallback):
             try:
-                result = fn(*a)
+                result = getattr(self._app, method)(*a)
             except Exception as e:  # semnătura diferă între versiuni de pywin32/OneNote
                 last = e
                 continue

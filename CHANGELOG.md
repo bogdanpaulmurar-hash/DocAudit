@@ -4,8 +4,10 @@
 - Nou: pașii „Cum fac?” sus pe fiecare ecran (Sursă, Analiză, Grupuri, De aplicat, Arhivă și jurnal, Setări), în RO / EN / DE. Sunt deschiși până îi închizi; browserul ține minte. Cerut de Bogdan: „nu am instrucțiuni”.
 - Nou: butonul „Verifică legătura cu OneNote” în Sursă (și în caseta de eroare). Verifică pe rând Windows, pywin32, OneNote desktop înregistrat, pornirea prin COM și notebook-urile deschise, cu ✓ / ✗ și ce e de făcut la primul ✗. Fără linie de comandă. Doar citire.
 - CLI: `diagnose [--demo]`, aceleași verificări în linia de comandă.
-- Teste: 121 trecute (`pytest -q`, Linux, Python 3.13).
-- Livrare: `git pull`, apoi din nou `Install.bat`.
+- Reparat: „AttributeError: OneNote.Application.GetHierarchy” (raportat de Bogdan pe laptopul de lucru). Biblioteca de tipuri OneNote nu era găsită prin registru, așa că pywin32 ajungea la legarea dinamică, pe care OneNote nu o acceptă. Legătura (`extract/connect.py`) încearcă acum pe rând: biblioteca înregistrată, biblioteca citită direct din `ONENOTE.EXE`, `comtypes` (instalat acum de `Install.bat`), apoi legarea dinamică. Fiecare variantă e verificată cu o citire mică. „Verifică legătura cu OneNote” arată ce variantă a mers și ce a picat înainte. Aceeași legătură o folosesc și scrierea și notebook-ul de test.
+- Reparat: după actualizare rula încă DocAudit-ul vechi (scurtătura doar deschidea browserul), de aceea apăreau texte ca „ui.source.treefail”. Acum o pornire de altă versiune îi cere celei vechi să se închidă și pornește în locul ei. Dacă cea veche e 0.1.2 sau mai veche și nu știe să se închidă, cea nouă pornește pe alt port.
+- Teste: 123 trecute (`pytest -q`, Linux, Python 3.13).
+- Livrare: `git pull`, apoi din nou `Install.bat` (instalează comtypes). O singură dată: închide DocAudit-ul vechi din iconița de lângă ceas.
 
 ## 0.1.2 — 2026-10-28
 - Reparat: în „Sursă” nu se putea alege niciun notebook. Eroarea de la OneNote apărea doar 7 secunde într-un mesaj jos, iar dacă OneNote desktop nu dădea niciun notebook, lista rămânea goală, fără explicație. Acum eroarea (sau lista goală) rămâne în pagină, cu ce e de verificat. Raportat de Bogdan.

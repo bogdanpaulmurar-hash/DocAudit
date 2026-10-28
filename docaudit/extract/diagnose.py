@@ -76,7 +76,9 @@ def diagnose(make_source: Callable[[], OneNoteSource] | None = None,
         return checks
     try:
         source = (make_source or _real_source)()
-        checks.append(Check("com", True))
+        how = getattr(source, "_how", "")
+        tried = getattr(source, "_problems", None) or []
+        checks.append(Check("com", True, how + (f" (înainte: {'; '.join(tried)})" if tried else "")))
     except OneNoteError as e:
         checks += [Check("com", False, str(e)), Check("notebooks", None)]
         return checks

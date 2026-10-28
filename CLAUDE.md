@@ -4,7 +4,7 @@ Reguli globale: GLOBAL_RULES.md (v1.2)
 Verificator local de documentație exportată din OneNote: extrage paginile din notebook-urile alese, grupează paginile care descriu aceeași procedură, le compară și listează conflictele și paginile învechite pentru decizia utilizatorului. Python 3.12 pe Windows, interfață web locală (127.0.0.1) pornită din tray cu `pythonw -m docaudit`.
 
 ## Comenzi
-- Instalare: `pip install -e .[dev]` (Python 3.11+); pe Windows `pip install -e .[dev,windows]` (pywin32 pentru COM)
+- Instalare: `pip install -e .[dev]` (Python 3.11+); pe Windows `pip install -e .[dev,windows]` (pywin32 + comtypes pentru COM)
 - Teste: `pytest -q` (CI: Ubuntu + Windows, Python 3.11 și 3.12)
 - Eșantion fictiv: `python -m docaudit sample` (regenerează `tests/fixtures/sample_v1/`)
 - Validare format: `python -m docaudit validate <folder>`
@@ -39,6 +39,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/paths.py` — `data_dir()`, `resolve_folder()`, `backups_dir()`, `datasets()`
 - `docaudit/settings.py` — setările în `data_dir()/settings.json`; `write_enabled` e `False` implicit (mod doar citire)
 - `docaudit/extract/onenote_xml.py` — XML OneNote 2013 (ierarhie, pagină) → Page; `render_*` pentru teste și notebook-ul de test
+- `docaudit/extract/connect.py` — legătura COM cu mai multe încercări (biblioteca înregistrată, din ONENOTE.EXE, comtypes, dinamic), folosită de citire, scriere și notebook-ul de test
 - `docaudit/extract/com.py` — `ReadOnlyOneNote`: doar GetHierarchy și GetPageContent
 - `docaudit/extract/run.py` — extragere cu selecție, incremental după data modificării, cache de imagini
 - `docaudit/extract/selection.py` — bife (notebook / secțiune / pagină), excluderi („Arhivă”), profiluri

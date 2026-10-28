@@ -20,7 +20,7 @@ DocAudit se folosește dintr-o interfață în browser, pornită din iconița de
 
 ## 3. Pornire
 - Dublu clic pe **DocAudit** (Desktop sau meniul Start). Apare iconița în tray (lângă ceas) și se deschide browserul.
-- Clic pe iconița din tray → „Deschide DocAudit”; „Închide” oprește serverul. Dacă DocAudit rulează deja, scurtătura doar deschide browserul.
+- Clic pe iconița din tray → „Deschide DocAudit”; „Închide” oprește serverul. Dacă DocAudit rulează deja, scurtătura doar deschide browserul. După o actualizare, scurtătura închide singură versiunea veche (de la 0.1.3 încolo); de la 0.1.2 sau mai vechi închide-o o dată din iconiță.
 - Fără scurtătură: `DocAudit.bat ui` (oprești cu Ctrl+C).
 - Limba (RO / EN / DE) se schimbă din colțul dreapta sus. Butonul 🌓 schimbă tema luminoasă / întunecată.
 

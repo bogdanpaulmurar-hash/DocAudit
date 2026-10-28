@@ -307,3 +307,34 @@ def test_icon_files(tmp_path):
     assert struct.unpack("<HHH", icon[:6]) == (0, 1, 2)
     assert main(["make-icon", str(tmp_path / "i")]) == 0
     assert (tmp_path / "i" / "docaudit.ico").stat().st_size > 100
+
+
+# ---------- o pornire nouă după actualizare ----------
+
+def test_new_version_replaces_old_instance(tmp_path, monkeypatch):
+    import docaudit.tray as tray
+
+    monkeypatch.setenv("DOCAUDIT_DATA", str(tmp_path / "data"))
+    old = DocAuditServer("127.0.0.1", 0)
+    port = old.server_address[1]
+    t_old = threading.Thread(target=old.serve_forever, daemon=True)
+    t_old.start()
+    tray._write_instance(old)
+    assert tray.start_server(port) is None  # aceeași versiune: doar se deschide browserul
+    monkeypatch.setattr(tray, "__version__", "9.9.9")  # „pornirea nouă” e altă versiune
+    new = tray.start_server(port)
+    try:
+        t_old.join(timeout=5)
+        assert not t_old.is_alive() and new is not None  # cea veche s-a oprit, cea nouă ascultă
+    finally:
+        new.server_close()
+        old.server_close()
+
+
+def test_exe_of_command_line():
+    from docaudit.extract.connect import _exe_of
+
+    assert _exe_of('"C:\\Program Files\\Microsoft Office\\Root\\Office16\\ONENOTE.EXE" /x') == \
+        "C:\\Program Files\\Microsoft Office\\Root\\Office16\\ONENOTE.EXE"
+    assert _exe_of("C:\\Office\\ONENOTE.EXE /automation") == "C:\\Office\\ONENOTE.EXE"
+    assert _exe_of(None) is None

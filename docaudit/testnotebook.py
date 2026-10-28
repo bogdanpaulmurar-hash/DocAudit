@@ -33,13 +33,13 @@ def archive_pages() -> list[Page]:
 
 def create_test_notebook(folder: Path, name: str = "DocAudit Test") -> int:  # pragma: no cover - Windows
     import pythoncom  # type: ignore[import-not-found]
-    import win32com.client  # type: ignore[import-not-found]
+
+    from .extract.connect import connect
 
     if folder.exists():
         raise FileExistsError(f"{folder} există deja; alege un folder nou pentru notebook-ul de test")
     folder.parent.mkdir(parents=True, exist_ok=True)
-    pythoncom.CoInitialize()
-    app = win32com.client.gencache.EnsureDispatch("OneNote.Application")
+    app, _how, _ = connect()
     missing = pythoncom.Missing
 
     def open_h(path: str, relative_to: str, kind: int) -> str:
