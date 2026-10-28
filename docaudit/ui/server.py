@@ -234,7 +234,6 @@ def api_extract(body: dict) -> dict:
     def work(job: Job) -> dict:
         # Într-un proces separat: dacă OneNote se blochează într-un apel COM, procesul se
         # poate opri, iar interfața rămâne liberă (înainte rămânea „rulează deja o extragere”).
-        import subprocess
         import time
 
         from ..extract import worker
@@ -265,8 +264,7 @@ def api_extract(body: dict) -> dict:
                     cancel_at = now
                 if cancel_at is not None and now - cancel_at > worker.CANCEL_GRACE:
                     _lg.warning("Extragerea nu s-a oprit în %ss: procesul e oprit forțat", worker.CANCEL_GRACE)
-                    proc.kill()
-                    proc.wait(10)
+                    worker.kill_tree(proc)
                     status = {"state": "done", "result": {"name": name, "cancelled": True, "total": job.done,
                                                           "fetched": 0, "reused": 0, "skipped": 0, "removed": 0,
                                                           "errors": [], "error_count": 0,
@@ -275,17 +273,12 @@ def api_extract(body: dict) -> dict:
                 if now - last_beat > worker.STALL_SECONDS:
                     _lg.error("Extragerea nu mai avansează de %ss (pagina %s din %s): procesul e oprit",
                               worker.STALL_SECONDS, max(job.done, 1), job.total)
-                    proc.kill()
-                    try:
-                        proc.wait(10)
-                    except subprocess.TimeoutExpired:
-                        pass
+                    worker.kill_tree(proc)
                     raise ApiError(504, "ui.error.extract.stalled", page=max(job.done, 1), total=job.total,
                                    seconds=worker.STALL_SECONDS)
                 time.sleep(0.3)
         finally:
-            if proc.poll() is None:
-                proc.kill()
+            worker.kill_tree(proc)
             worker.cleanup(spec_path)
         if not status or status.get("state") == "running":
             raise ApiError(502, "ui.error.extract.crashed", page=max(job.done, 1), total=job.total,

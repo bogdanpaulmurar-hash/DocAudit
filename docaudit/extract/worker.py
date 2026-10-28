@@ -134,6 +134,25 @@ def spawn(spec: dict, job_id: str) -> tuple[subprocess.Popen, Path]:
     return proc, spec_path
 
 
+def kill_tree(proc: subprocess.Popen) -> None:
+    """Oprește procesul de extragere împreună cu ce a pornit el (PowerShell pentru citirea paginilor)."""
+    if proc.poll() is not None:
+        return
+    if sys.platform == "win32":  # pragma: no cover - Windows
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=15, creationflags=flags)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if proc.poll() is None:
+        proc.kill()
+    try:
+        proc.wait(10)
+    except subprocess.TimeoutExpired:
+        pass
+
+
 def cleanup(spec_path: Path) -> None:
     for suffix in (".json", ".status.json", ".status.tmp", ".cancel"):
         try:
