@@ -142,3 +142,4 @@ progress { width: min(320px, 100%); height: 14px; }
 .botdoc summary { cursor: pointer; }
 ul.plain { list-style: none; padding-left: 8px; margin: 6px 0; }
 ul.plain li { gap: 6px; padding: 2px 0; }
+textarea.instructions { width: 100%; font: 12px/1.45 ui-monospace, Consolas, monospace; }

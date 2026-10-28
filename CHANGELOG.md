@@ -1,5 +1,14 @@
 # CHANGELOG — DocAudit
 
+## 0.1.11 — 2026-10-28
+- „Export pentru bot” pregătește acum și ce îi trebuie botului, care nu are acces la OneNote:
+  - **`00_Cuprins.pdf`**, încărcat în bot cu documentele: fiecare document, secțiunile și titlurile paginilor cu data ultimei modificări, plus ultimele schimbări (pagini noi, modificate, mutate dintr-un document în altul, scoase). Ține loc de memorie pentru bot. Un export fără noutăți nu-l schimbă, deci nu cere reîncărcare;
+  - **instrucțiunile botului** (`_Instructiuni_bot.md` în folderul documentelor și în ecran, cu „Copiază”), regenerate la fiecare export: răspunde în limba întrebării (română sau germană), doar din documente, cu sursa (fișier și titlul paginii), păstrează valorile exacte, spune când nu găsește răspunsul și când două pagini se contrazic. Ecranul spune când s-au schimbat și trebuie copiate din nou în configurarea botului;
+  - istoricul exporturilor în `<extragere>/bot/istoric_modificari.md`.
+- „Alege folderul…” lângă folderul documentelor (fereastra Windows). Fișierele din folder care nu sunt făcute de DocAudit (de ex. de la scriptul vechi) sunt arătate și pot fi mutate într-un subfolder `_vechi_<dată>`; nimic nu se șterge.
+- Teste: 163 trecute (`pytest -q`, Linux).
+- Livrare: `git pull`, apoi `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.10 — 2026-10-28
 - `Install.bat` instalează acum tot, inclusiv asemănarea după sens (modelul se descarcă doar prima dată). După fiecare `git pull` ajunge `Install.bat`, fără alt cuvânt. `Install.bat semantic` merge în continuare (face același lucru); `Install.bat baza` instalează fără model.
 - Livrare: `git pull`, apoi `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.

@@ -96,6 +96,8 @@ DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în br
 - Verifică lista: o pagină debifată nu intră; din „Lăsate deoparte” poți bifa o pagină ca să intre totuși. „↺ automat” anulează alegerea ta.
 - **Exportă**: fiecare pagină devine PDF prin OneNote (`Publish`, doar fișiere pe disc; OneNote nu se schimbă). Dacă PDF-ul nu merge, se încearcă prin Word, apoi prin pagina web, apoi din textul extras. Prima dată durează (pe 700 de pagini, probabil zeci de minute); după aceea se refolosesc PDF-urile paginilor neschimbate.
 - La final: încarcă în bot **doar** fișierele din „De reîncărcat în bot”. Paginile din „De verificat de mână” (secțiuni cu parolă, pagini pe care OneNote nu le-a putut exporta) exportă-le tu din OneNote: Fișier → Export → Pagină → PDF.
+- Folderul cu PDF-urile de la scriptul vechi: alege-l cu **Alege folderul…**. DocAudit îți arată fișierele care nu sunt ale lui și, dacă vrei, le mută în `_vechi_<dată>` (nu le șterge). După ce încarci documentele noi în bot, scoate-le pe cele vechi din bot.
+- Pe lângă documente se face **`00_Cuprins.pdf`** (încarcă-l în bot; are lista documentelor și ultimele schimbări) și **instrucțiunile botului** (în ecran, butonul „Copiază”, și în `_Instructiuni_bot.md`). Instrucțiunile se pun în configurarea botului, nu printre documente; când ecranul spune că s-au schimbat, copiază-le din nou.
 - Primul test: pune limita mică (de ex. 5 MB) și „Un document pe: secțiune” pe o extragere mică, ca să vezi cum se împart fișierele.
 
 ## 10. Limbă și curățenie

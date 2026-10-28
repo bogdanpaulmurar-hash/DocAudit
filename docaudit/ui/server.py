@@ -393,7 +393,7 @@ def _bot_options(body: dict) -> dict:
 
 def api_bot_plan(q: dict) -> dict:
     """Ce pagini intră în documentele pentru bot (și de ce lipsesc celelalte)."""
-    from ..bot.export import default_out_dir, is_offline, last_run
+    from ..bot.export import default_out_dir, foreign_files, is_offline, last_run
     from ..bot.select import build_plan
 
     folder = _dataset(q.get("ds"))
@@ -403,8 +403,10 @@ def api_bot_plan(q: dict) -> dict:
         plan = build_plan(folder, **opts)
     except ValueError:
         raise ApiError(400, "ui.error.settings", error="level")
+    out_dir = Path(s.bot_out_dir) if s.bot_out_dir else default_out_dir(folder)
     return {**plan.to_dict(), "options": opts, "max_mb": s.bot_max_mb,
-            "out_dir": s.bot_out_dir or str(default_out_dir(folder)), "custom_out_dir": bool(s.bot_out_dir),
+            "out_dir": str(out_dir), "custom_out_dir": bool(s.bot_out_dir),
+            "foreign": foreign_files(folder, out_dir),
             "offline": is_offline(folder), "compared": (folder / "findings.json").is_file(),
             "last": last_run(folder)}
 
@@ -441,6 +443,51 @@ def api_bot_export(body: dict) -> dict:
             raise ApiError(503, job.error["error"], **job.error["params"])
         return job.result or {}
     return {"job": job.id}
+
+
+def api_bot_move_foreign(body: dict) -> dict:
+    """Mută fișierele care nu sunt ale DocAudit (de la scriptul vechi) într-un subfolder `_vechi_…`."""
+    from ..bot.export import default_out_dir, move_foreign
+
+    folder = _dataset(body.get("ds"))
+    s = load_settings()
+    out_dir = Path(s.bot_out_dir) if s.bot_out_dir else default_out_dir(folder)
+    names = [str(n) for n in body.get("names") or []]
+    target = move_foreign(folder, out_dir, names)
+    return {"moved": len(names) if target else 0, "to": str(target) if target else ""}
+
+
+PICK_FOLDER_SCRIPT = r"""
+Add-Type -AssemblyName System.Windows.Forms
+$owner = New-Object System.Windows.Forms.Form -Property @{TopMost = $true; ShowInTaskbar = $false}
+$d = New-Object System.Windows.Forms.FolderBrowserDialog
+$d.Description = 'DocAudit'
+$d.ShowNewFolderButton = $true
+if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) {
+  [Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d.SelectedPath)))
+}
+"""
+
+
+def api_bot_pick_folder(body: dict) -> dict:
+    """Fereastra Windows „Alege folderul” (local, pe calculatorul utilizatorului); întoarce calea aleasă."""
+    if sys.platform != "win32":
+        raise ApiError(501, "ui.bot.pick.unsupported")
+    import base64  # pragma: no cover - Windows
+    import shutil
+    import subprocess
+
+    exe = shutil.which("powershell.exe") or shutil.which("powershell")
+    if not exe:
+        raise ApiError(501, "ui.bot.pick.unsupported")
+    encoded = base64.b64encode(PICK_FOLDER_SCRIPT.encode("utf-16-le")).decode("ascii")
+    try:
+        r = subprocess.run([exe, "-NoProfile", "-NonInteractive", "-STA", "-EncodedCommand", encoded],
+                           capture_output=True, timeout=600, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError) as e:
+        raise ApiError(500, "ui.error.internal", error=type(e).__name__)
+    out = r.stdout.decode("ascii", "ignore").strip()
+    return {"path": base64.b64decode(out).decode("utf-8") if out else ""}
 
 
 def api_bot_open(body: dict) -> dict:
@@ -570,7 +617,8 @@ POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/d
                "/api/settings": api_settings, "/api/link": api_link,
                "/api/dataset/delete": api_delete_dataset, "/api/settings/reset": api_reset_settings,
                "/api/job/cancel": api_job_cancel, "/api/bot/override": api_bot_override,
-               "/api/bot/export": api_bot_export, "/api/bot/open": api_bot_open}
+               "/api/bot/export": api_bot_export, "/api/bot/open": api_bot_open,
+               "/api/bot/move-foreign": api_bot_move_foreign, "/api/bot/pick-folder": api_bot_pick_folder}
 WRITE_ROUTES = {"/api/analyze", "/api/apply", "/api/restore", "/api/dataset/delete"}
 
 
