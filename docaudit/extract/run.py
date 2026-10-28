@@ -148,7 +148,7 @@ def extract_to_dataset(
                 report.errors.append(f"{hp.notebook}/{'/'.join(hp.section_path)}/{hp.title}: {e}")
                 lg.error("Pagina %d din %d nu s-a putut citi: %s", n, len(wanted), log.describe_error(e))
                 failures_in_a_row += 1
-                if report.fetched == 0 and failures_in_a_row >= abort_after:
+                if getattr(e, "fatal", False) or (report.fetched == 0 and failures_in_a_row >= abort_after):
                     report.aborted = log.describe_error(e)
                     raise _Abort from e
                 continue
@@ -168,8 +168,8 @@ def extract_to_dataset(
                         report.fetched, report.reused, len(report.errors))
                 last_log = time.monotonic()
     except _Abort:
-        lg.error("Extragere oprită: primele %d pagini au picat toate (%s). Nu s-a salvat nimic nou.",
-                 abort_after, report.aborted)
+        lg.error("Extragere oprită după %d pagini care au picat (%s). Nu s-a salvat nimic nou.",
+                 failures_in_a_row, report.aborted)
         report.seconds = time.monotonic() - started
         return report
 

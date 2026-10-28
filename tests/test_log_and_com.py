@@ -167,14 +167,17 @@ def test_com_caller_stops_on_rpc_error():
     assert len(app.calls) == 1  # nu mai încearcă celelalte 5 variante pe un OneNote căzut
 
 
-def _readonly(app, monkeypatch):
+def _readonly(app, monkeypatch, tmp_path):
     from docaudit.extract import com
 
+    monkeypatch.setenv("DOCAUDIT_DATA", str(tmp_path / "data"))
     monkeypatch.setattr(com, "PAUSE", 0)
+    monkeypatch.setattr(com, "RECOVER", 0)
     monkeypatch.setattr(com.time, "sleep", lambda s: None)
     ro = com.ReadOnlyOneNote.__new__(com.ReadOnlyOneNote)
-    ro._missing, ro.without_images, ro._how = MISSING, 0, "test"
+    ro._missing, ro.without_images, ro._how, ro._problems = MISSING, 0, "test", []
     ro.reconnects = 0
+    ro._init_ways()
 
     def reconnect():
         ro.reconnects += 1
@@ -185,13 +188,145 @@ def _readonly(app, monkeypatch):
     return ro
 
 
-def test_readonly_reconnects_after_onenote_crash(monkeypatch):
-    app = CrashingOneNote(crashes=1)
-    ro = _readonly(app, monkeypatch)
-    assert ro.get_page_xml("p") == "<page info='1'/>" and ro.reconnects == 1 and ro.without_images == 0
+def test_readonly_page_crash_after_way_works(monkeypatch, tmp_path):
+    app = CrashingOneNote(crashes=0)
+    ro = _readonly(app, monkeypatch, tmp_path)
+    assert ro.get_page_xml("p1") == "<page info='1'/>"
+    app.crashes, app.with_images_only = 1, True
+    assert ro.get_page_xml("p2") == "<page info='0'/>" and ro.reconnects == 1 and ro.without_images == 1
 
 
-def test_readonly_falls_back_to_page_without_images(monkeypatch):
-    app = CrashingOneNote(crashes=5, crash_with_images_only=True)
-    ro = _readonly(app, monkeypatch)
-    assert ro.get_page_xml("p") == "<page info='0'/>" and ro.without_images == 1
+def test_readonly_first_page_crash_with_no_other_way_stops(monkeypatch, tmp_path):
+    from docaudit.extract import com, psbridge
+
+    monkeypatch.setattr(psbridge.shutil, "which", lambda name: None)  # fără PowerShell
+    ro = _readonly(CrashingOneNote(crashes=2), monkeypatch, tmp_path)  # cade cu și fără imagini
+    with pytest.raises(com.OneNoteError, match="toate căile") as e:
+        ro.get_page_xml("p")
+    assert e.value.fatal and com.load_read_memory()["crashed"] == ["pywin32"]
+
+
+# ---------- căile de citire a paginilor (OneNote cade la fiecare pagină prin pywin32) ----------
+
+def _gone(code=-2147023170):
+    from docaudit.extract.connect import OneNoteGone
+
+    return OneNoteGone("GetPageContent", code, False)
+
+
+def _ways(monkeypatch, tmp_path, behaviour):
+    """ReadOnlyOneNote cu căi false: behaviour[cale] = funcție (page_id, info) sau excepție la pornire."""
+    from docaudit.extract import com
+
+    monkeypatch.setenv("DOCAUDIT_DATA", str(tmp_path / "data"))
+    monkeypatch.setattr(com, "PAUSE", 0)
+    monkeypatch.setattr(com, "RECOVER", 0)
+    ro = com.ReadOnlyOneNote.__new__(com.ReadOnlyOneNote)
+    ro._missing, ro.without_images = MISSING, 0
+    ro._init_ways()
+    started = []
+
+    def reader(way):
+        if way not in ro._readers:
+            started.append(way)
+            b = behaviour.get(way, com._Unusable("lipsește"))
+            if isinstance(b, Exception):
+                raise b
+            ro._readers[way] = b
+        return ro._readers[way]
+
+    ro._reader = reader
+    return ro, started
+
+
+def test_page_way_switches_after_crash_and_is_remembered(monkeypatch, tmp_path):
+    from docaudit.extract import com
+
+    calls = []
+
+    def powershell(pid, info):
+        calls.append(("powershell", pid, info))
+        raise _gone()
+
+    def pywin32(pid, info):
+        calls.append(("pywin32", pid, info))
+        return f"<page id='{pid}' info='{info}'/>"
+
+    ro, started = _ways(monkeypatch, tmp_path, {"powershell": powershell, "pywin32": pywin32})
+    assert ro.get_page_xml("a") == "<page id='a' info='1'/>"
+    assert ro.get_page_xml("b").startswith("<page id='b'")
+    assert calls == [("powershell", "a", 1), ("powershell", "a", 0),  # cu imagini, apoi o dată fără
+                     ("pywin32", "a", 1), ("pywin32", "b", 1)]
+    assert com.load_read_memory() == {"crashed": ["powershell"], "ok": "pywin32"}
+    ro2, started2 = _ways(monkeypatch, tmp_path, {"powershell": powershell, "pywin32": pywin32})
+    ro2.get_page_xml("c")
+    assert started2 == ["pywin32"] and len(calls) == 5  # rularea următoare nu mai face OneNote să cadă
+
+
+def test_first_page_only_without_images_keeps_the_way(monkeypatch, tmp_path):
+    def powershell(pid, info):
+        if info == 1:
+            raise _gone()
+        return "<page info='0'/>"
+
+    ro, started = _ways(monkeypatch, tmp_path, {"powershell": powershell})
+    assert ro.get_page_xml("a") == "<page info='0'/>" and ro.without_images == 1 and ro._way == "powershell"
+
+
+def test_page_way_unusable_is_skipped_without_crash(monkeypatch, tmp_path):
+    from docaudit.extract import com
+
+    ro, started = _ways(monkeypatch, tmp_path, {
+        "powershell": com._Unusable("PowerShell nu a fost găsit"),
+        "pywin32": lambda pid, info: (_ for _ in ()).throw(AttributeError("GetPageContent")),
+        "comtypes": lambda pid, info: "<page/>"})
+    assert ro.get_page_xml("a") == "<page/>"
+    assert started == ["powershell", "pywin32", "comtypes"]
+    assert com.load_read_memory() == {"ok": "comtypes"}  # nimic marcat „cade”
+
+
+def test_all_ways_crash_stops_extraction_at_first_page(monkeypatch, tmp_path):
+    from docaudit.extract import com
+
+    def crash(pid, info):
+        raise _gone()
+
+    ro, started = _ways(monkeypatch, tmp_path, {w: crash for w in com.WAYS})
+    hier = DemoOneNote()
+    ro.get_hierarchy_xml = hier.get_hierarchy_xml
+    report = extract_to_dataset(ro, Selection(), tmp_path / "x")
+    assert report.aborted and "toate căile" in report.aborted and len(report.errors) == 1
+    assert list(dict.fromkeys(started)) == list(com.WAYS) and len(started) == 2 * len(com.WAYS)  # cu și fără imagini, apoi stop
+
+
+def test_page_that_crashes_after_way_works_is_read_without_images(monkeypatch, tmp_path):
+    seen = []
+
+    def pywin32(pid, info):
+        seen.append((pid, info))
+        if pid == "rea" and info == 1:
+            raise _gone()
+        return f"<page info='{info}'/>"
+
+    ro, _ = _ways(monkeypatch, tmp_path, {"pywin32": pywin32})
+    assert ro.get_page_xml("buna") == "<page info='1'/>"
+    assert ro.get_page_xml("rea") == "<page info='0'/>" and ro.without_images == 1
+    assert ro._way == "pywin32"  # calea rămâne aceeași: doar pagina era problema
+
+
+def test_powershell_reply_parsing():
+    import base64
+
+    from docaudit.extract.connect import OneNoteGone
+    from docaudit.extract.psbridge import SCRIPT, parse_reply
+
+    xml = "<one:Page>ăîșț ü</one:Page>"
+    assert parse_reply("OK " + base64.b64encode(xml.encode()).decode() + "\r\n") == xml
+    with pytest.raises(OneNoteGone):
+        parse_reply("ERR -2147023170 The remote procedure call failed.")
+    with pytest.raises(OneNoteGone):
+        parse_reply("")  # PowerShell s-a oprit fără răspuns
+    with pytest.raises(RuntimeError, match="0x80042014"):
+        parse_reply("ERR -2147213292 page not found")
+    for word in ("UpdatePageContent", "DeleteHierarchy", "UpdateHierarchy", "Publish", "CreateNewPage"):
+        assert word not in SCRIPT  # scriptul doar citește
