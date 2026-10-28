@@ -162,10 +162,12 @@ class Job:
         self.result: dict | None = None
         self.error: dict | None = None
         self.cancel = threading.Event()
+        self.child_log: list[str] = []  # rândurile de log ale procesului de extragere
 
     def to_dict(self) -> dict:
         return {"id": self.id, "kind": self.kind, "state": self.state, "done": self.done, "total": self.total,
-                "result": self.result, "error": self.error, "log": log.tail(12)}
+                "result": self.result, "error": self.error,
+                "log": (self.child_log or log.tail(12))[-12:]}
 
 
 _jobs: dict[str, Job] = {}
@@ -218,8 +220,6 @@ def api_log(q: dict) -> dict:
 
 def api_extract(body: dict) -> dict:
     """Pornește extragerea în fundal; progresul se citește din /api/job."""
-    from ..extract.com import OneNoteError
-    from ..extract.run import extract_to_dataset
     from ..extract.selection import Selection, save_profile
 
     name = (body.get("out") or ("demo" if body.get("demo") else "onenote")).strip()
@@ -232,28 +232,68 @@ def api_extract(body: dict) -> dict:
         save_profile(data_dir() / "profiles", body["profile"], sel)
 
     def work(job: Job) -> dict:
-        def progress(n: int, total: int, _title: str) -> None:
-            job.done, job.total = n, total
+        # Într-un proces separat: dacă OneNote se blochează într-un apel COM, procesul se
+        # poate opri, iar interfața rămâne liberă (înainte rămânea „rulează deja o extragere”).
+        import subprocess
+        import time
 
+        from ..extract import worker
+
+        spec = {"name": name, "demo": bool(body.get("demo")), "full": bool(body.get("full")),
+                "selection": sel.to_dict(), "out": str(data_dir() / name)}
+        if body.get("hang_after") is not None:  # doar testele: OneNote „înghețat”
+            spec["hang_after"] = int(body["hang_after"])
+        proc, spec_path = worker.spawn(spec, job.id)
+        status_path = spec_path.with_suffix(".status.json")
+        cancel_path = spec_path.with_suffix(".cancel")
+        started = last_beat = time.time()
+        cancel_at = None
+        status: dict | None = None
         try:
-            if body.get("demo"):
-                from ..extract.demo import DemoOneNote
-
-                source, label = DemoOneNote(), "demo (eșantion fictiv)"
-            else:  # pragma: no cover - Windows
-                from ..extract.com import ReadOnlyOneNote
-
-                source, label = ReadOnlyOneNote(), "OneNote desktop (COM)"
-            report = extract_to_dataset(source, sel, data_dir() / name, incremental=not body.get("full"),
-                                        source_label=label, progress=progress, cancel=job.cancel.is_set)
-        except OneNoteError as e:
-            raise ApiError(503, "ui.error.onenote", error=str(e))
-        if report.aborted:
-            raise ApiError(502, "ui.error.extract.aborted", error=report.aborted)
-        return {"name": name, "total": report.total, "fetched": report.fetched, "reused": report.reused,
-                "skipped": report.skipped, "removed": report.removed, "errors": report.errors[:50],
-                "error_count": len(report.errors), "cancelled": report.cancelled,
-                "seconds": round(report.seconds)}
+            while True:
+                status = worker.read_status(status_path) or status
+                if status:
+                    job.done, job.total = status.get("done", job.done), status.get("total", job.total)
+                    job.child_log = status.get("log") or job.child_log
+                    last_beat = max(last_beat, float(status.get("beat", 0)))
+                if proc.poll() is not None:
+                    status = worker.read_status(status_path) or status
+                    break
+                now = time.time()
+                if job.cancel.is_set() and cancel_at is None:
+                    cancel_path.touch()
+                    cancel_at = now
+                if cancel_at is not None and now - cancel_at > worker.CANCEL_GRACE:
+                    _lg.warning("Extragerea nu s-a oprit în %ss: procesul e oprit forțat", worker.CANCEL_GRACE)
+                    proc.kill()
+                    proc.wait(10)
+                    status = {"state": "done", "result": {"name": name, "cancelled": True, "total": job.done,
+                                                          "fetched": 0, "reused": 0, "skipped": 0, "removed": 0,
+                                                          "errors": [], "error_count": 0,
+                                                          "seconds": round(now - started)}}
+                    break
+                if now - last_beat > worker.STALL_SECONDS:
+                    _lg.error("Extragerea nu mai avansează de %ss (pagina %s din %s): procesul e oprit",
+                              worker.STALL_SECONDS, max(job.done, 1), job.total)
+                    proc.kill()
+                    try:
+                        proc.wait(10)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    raise ApiError(504, "ui.error.extract.stalled", page=max(job.done, 1), total=job.total,
+                                   seconds=worker.STALL_SECONDS)
+                time.sleep(0.3)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+            worker.cleanup(spec_path)
+        if not status or status.get("state") == "running":
+            raise ApiError(502, "ui.error.extract.crashed", page=max(job.done, 1), total=job.total,
+                           code=proc.returncode)
+        if status["state"] == "error":
+            code = 503 if status["error"] == "ui.error.onenote" else 502
+            raise ApiError(code, status["error"], **status.get("params", {}))
+        return status["result"]
 
     job = _start_job("extract", work)
     if body.get("wait"):  # linia de comandă și testele: așteaptă rezultatul

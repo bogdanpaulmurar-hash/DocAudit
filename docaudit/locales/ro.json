@@ -318,5 +318,7 @@
   "ui.log.empty": "Logul e gol.",
   "ui.log.refresh": "Reîmprospătează",
   "diag.pages": "Citirea unei pagini",
-  "diag.pages.fix": "OneNote dă lista, dar nu și conținutul paginilor. Deschide notebook-ul în OneNote desktop și așteaptă sincronizarea (fără cerc roșu), apoi verifică din nou. Dacă tot pică, trimite-mi textul de mai sus; e și în log."
+  "diag.pages.fix": "OneNote dă lista, dar nu și conținutul paginilor. Deschide notebook-ul în OneNote desktop și așteaptă sincronizarea (fără cerc roșu), apoi verifică din nou. Dacă tot pică, trimite-mi textul de mai sus; e și în log.",
+  "ui.error.extract.stalled": "OneNote nu a mai răspuns {seconds} secunde la pagina {page} din {total}, așa că DocAudit a oprit extragerea. Paginile citite până acum sunt păstrate. Verifică dacă OneNote arată o fereastră (de exemplu „How do you want to start OneNote?”), alege Start Normally, așteaptă sincronizarea și pornește din nou extragerea: continuă de unde a rămas.",
+  "ui.error.extract.crashed": "Procesul de extragere s-a oprit neașteptat la pagina {page} din {total} (cod {code}). Paginile citite până acum sunt păstrate. Detalii în Setări → Log tehnic."
 }

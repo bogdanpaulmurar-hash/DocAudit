@@ -109,6 +109,10 @@ def main(argv: list[str] | None = None) -> int:
     log.setup()
     if argv[:1] and not argv[0].startswith("-"):
         log.get("cli").info("Comandă: %s", argv[0])  # doar numele comenzii, fără argumente (pot fi nume)
+    if argv[:1] == ["extract-worker"] and len(argv) == 2:  # ascunsă: procesul pornit de interfață
+        from .extract.worker import run_worker
+
+        return run_worker(Path(argv[1]))
     if not argv:
         from .tray import run_app
 

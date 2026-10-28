@@ -77,7 +77,8 @@ DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în br
 3. Fără COM (de exemplu blocat de IT): exportă paginile din OneNote ca .docx sau .mht și folosește `DocAudit.bat import-files <folder>`.
 
 ## 8. Notebook mare și logul tehnic
-- Extragerea rulează în fundal, cu „Pagina N din M” și butonul **Oprește**. Ce s-a citit se salvează la fiecare 50 de pagini; „Extrage” din nou continuă de unde a rămas (paginile neschimbate nu se mai cer din OneNote).
+- Extragerea rulează în fundal, cu „Pagina N din M” și butonul **Oprește**. Ce s-a citit se salvează la fiecare 20 de pagini; „Extrage” din nou continuă de unde a rămas (paginile neschimbate nu se mai cer din OneNote).
+- Dacă OneNote nu mai răspunde 3 minute la aceeași pagină (de exemplu a apărut fereastra „How do you want to start OneNote?”), DocAudit oprește singur extragerea și spune pagina. Alege Start Normally în OneNote, așteaptă sincronizarea și apasă din nou „Extrage”.
 - Dacă primele pagini nu se pot citi deloc, extragerea se oprește singură după 5 încercări, cu eroarea afișată, în loc să încerce sute de pagini.
 - **Logul tehnic** (Setări → Log tehnic) arată ce a făcut DocAudit: câte pagini, cât a durat, ce eroare a dat OneNote. Nu conține titluri, nume de notebook-uri sau text din pagini.
   - local: `%LOCALAPPDATA%\DocAudit\data\logs\docaudit.log`;
