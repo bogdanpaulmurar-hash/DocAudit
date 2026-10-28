@@ -1,15 +1,17 @@
 @echo off
 rem DocAudit - instalare fara admin. Mediul Python sta in %LOCALAPPDATA%\DocAudit\venv.
-rem Folosire: Install.bat            (instalare de baza)
-rem           Install.bat semantic   (plus asemanarea dupa sens; descarca modelul o singura data)
+rem Folosire: Install.bat            (tot, cu asemanarea dupa sens; modelul se descarca o singura data)
+rem           Install.bat baza       (fara asemanarea dupa sens, fara internet pentru model)
+rem Dupa fiecare git pull ajunge Install.bat, fara alt argument.
 chcp 65001 >nul
 setlocal
 set "PYTHONIOENCODING=utf-8"
 set "ROOT=%~dp0"
 set "APP=%LOCALAPPDATA%\DocAudit"
 set "VENV=%APP%\venv"
-set "EXTRAS=windows,tray"
-if /I "%~1"=="semantic" set "EXTRAS=windows,tray,semantic"
+set "EXTRAS=windows,tray,semantic"
+set "MODEL=1"
+if /I "%~1"=="baza" (set "EXTRAS=windows,tray" & set "MODEL=0")
 
 where py >nul 2>nul
 if %errorlevel%==0 (set "PY=py -3") else (set "PY=python")
@@ -31,8 +33,8 @@ set "RC=%errorlevel%"
 popd
 if not "%RC%"=="0" goto :fail
 
-if /I "%~1"=="semantic" (
-  echo Descarc modelul pentru asemanarea dupa sens - singura data cand DocAudit foloseste internetul ...
+if "%MODEL%"=="1" (
+  echo Verific modelul pentru asemanarea dupa sens - se descarca doar prima data; e singura data cand DocAudit foloseste internetul ...
   "%VENV%\Scripts\python.exe" -m docaudit download-model || goto :fail
 )
 echo Creez iconita si scurtaturile DocAudit (Desktop si meniul Start) ...

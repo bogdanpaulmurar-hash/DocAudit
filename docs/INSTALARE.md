@@ -5,14 +5,14 @@ DocAudit se folosește dintr-o interfață în browser, pornită din iconița de
 ## 1. Instalare (o singură dată, fără admin)
 1. Lasă Google Drive să termine sincronizarea, apoi în `G:\My Drive\Dev\DocAudit` rulează `git pull`.
 2. Dublu clic pe **`Install.bat`**.
-   - Creează mediul Python în `%LOCALAPPDATA%\DocAudit\venv` și instalează DocAudit, plus iconița din tray (pystray, Pillow). Repo-ul din Drive nu se modifică.
+   - Creează mediul Python în `%LOCALAPPDATA%\DocAudit\venv` și instalează DocAudit cu tot ce-i trebuie: iconița din tray (pystray, Pillow), unirea PDF-urilor pentru bot (pypdf) și asemănarea după sens. Repo-ul din Drive nu se modifică.
    - Creează scurtătura **DocAudit** pe Desktop și în meniul Start, cu iconiță.
    - Ai nevoie de Python 3.11+ (din Microsoft Store sau de pe python.org).
 3. La final apare versiunea, de exemplu „DocAudit 0.1.0”.
 
-**Opțional, asemănarea după sens** (leagă aceeași procedură scrisă în română, engleză sau germană): `Install.bat semantic`. Descarcă modelul o singură dată (câteva sute de MB). Aceasta e singura comandă DocAudit care folosește internetul, iar după ea totul rulează offline.
+**Asemănarea după sens** (leagă aceeași procedură scrisă în română, engleză sau germană) se instalează tot cu `Install.bat`, din 0.1.10. Modelul se descarcă o singură dată (câteva sute de MB); la rulările următoare doar se verifică. Aceasta e singura comandă DocAudit care folosește internetul, iar după ea totul rulează offline. Fără model și fără internet pentru el: `Install.bat baza`.
 
-**Actualizare:** după `git pull` rulează din nou `Install.bat` când CHANGELOG spune asta. Pentru 0.1.0, da: adaugă iconița și scurtăturile.
+**Actualizare:** după fiecare `git pull` rulează din nou `Install.bat` (fără alt cuvânt după el). Pentru 0.1.0, da: adaugă iconița și scurtăturile.
 
 ## 2. Unde stau datele
 - Extragerile, deciziile (`decisions.db`), setările și copiile de siguranță (`_backups`) stau în `%LOCALAPPDATA%\DocAudit\data`, **local, nu în Google Drive**.

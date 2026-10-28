@@ -19,7 +19,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Evaluare pe eșantion: `python -m docaudit group-eval DIR` (precizie, acoperire, F1 pe perechi)
 - Comparare: `python -m docaudit compare DIR` (după `group`) → `DIR/findings.json`; evaluare: `python -m docaudit compare-eval DIR`
 - Asemănare după sens (opțional): `pip install -e .[semantic]` + modelul descărcat o dată; rulează offline
-- Pe Windows: `Install.bat` (venv în `%LOCALAPPDATA%\DocAudit`, fără admin; `Install.bat semantic` cu modelul), apoi `DocAudit.bat <comandă>`. Pașii de instalare și test: `docs/INSTALARE.md`
+- Pe Windows: `Install.bat` (venv în `%LOCALAPPDATA%\DocAudit`, fără admin; din 0.1.10 instalează tot, inclusiv modelul semantic; `Install.bat baza` fără model). Bogdan rulează doar `Install.bat` după fiecare pull: nu-i cere alt argument, apoi `DocAudit.bat <comandă>`. Pașii de instalare și test: `docs/INSTALARE.md`
 - Pornire obișnuită: `pythonw -m docaudit` (fără comandă: tray + browser) sau `python -m docaudit ui [--port N] [--no-browser]`
 - Raport: `python -m docaudit report DIR [--format html|csv|md]`
 - Aplicare în OneNote: `python -m docaudit apply DIR` (previzualizare) · `--yes` (scrie, doar cu scrierea pornită în setări) · `restore DIR NUMĂR`
