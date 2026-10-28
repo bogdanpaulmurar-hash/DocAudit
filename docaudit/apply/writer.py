@@ -52,37 +52,38 @@ class ComOneNote:  # pragma: no cover - doar pe Windows, cu OneNote desktop
             import win32com.client  # type: ignore[import-not-found]  # noqa: F401
         except ImportError as e:
             raise OneNoteError("pywin32 lipsește sau sistemul nu e Windows") from e
-        from ..extract.connect import ConnectError, connect
+        from ..extract.connect import ComCaller, ConnectError, connect
 
-        self._missing = pythoncom.Missing
         try:
-            self._app, self._how, _ = connect()
+            app, self._how, _ = connect()
         except ConnectError as e:
             raise OneNoteError(f"OneNote desktop nu răspunde prin COM: {e}") from e
+        # Aceeași legătură ca la citire: locul pentru [out] se dă doar dacă legarea îl cere.
+        self._call = ComCaller(app, pythoncom.Missing)
 
-    @staticmethod
-    def _out(result):
-        if isinstance(result, tuple):
-            result = next((r for r in result if isinstance(r, str)), None)
-        return result
+    def _do(self, method: str, before: tuple, after: tuple = (), xml: bool = False, write: bool = True):
+        try:
+            return self._call(method, before, after, xml=xml, write=write)
+        except RuntimeError as e:
+            raise OneNoteError(str(e)) from e
 
     def get_hierarchy_xml(self) -> str:
-        return self._out(self._app.GetHierarchy("", HS_PAGES, self._missing, XS_2013))
+        return self._do("GetHierarchy", ("", HS_PAGES), (XS_2013,), xml=True, write=False)
 
     def get_page_xml(self, page_id: str) -> str:
-        return self._out(self._app.GetPageContent(page_id, self._missing, PI_BINARY_DATA, XS_2013))
+        return self._do("GetPageContent", (page_id,), (PI_BINARY_DATA, XS_2013), xml=True, write=False)
 
     def create_section(self, notebook_id: str, name: str) -> str:
-        return self._out(self._app.OpenHierarchy(f"{name}.one", notebook_id, self._missing, CFT_SECTION))
+        return self._do("OpenHierarchy", (f"{name}.one", notebook_id), (CFT_SECTION,))
 
     def create_page(self, section_id: str) -> str:
-        return self._out(self._app.CreateNewPage(section_id, self._missing, NPS_DEFAULT))
+        return self._do("CreateNewPage", (section_id,), (NPS_DEFAULT,))
 
     def update_page(self, xml: str) -> None:
-        self._app.UpdatePageContent(xml, 0, XS_2013)
+        self._call.app.UpdatePageContent(xml, 0, XS_2013)  # fără parametru [out]
 
     def delete_page(self, page_id: str) -> None:
-        self._app.DeleteHierarchy(page_id, 0, False)  # False = în Coș, nu definitiv
+        self._call.app.DeleteHierarchy(page_id, 0, False)  # False = în Coș, nu definitiv
 
 
 def _now() -> str:

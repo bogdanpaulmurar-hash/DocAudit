@@ -5,6 +5,7 @@ import json
 import shutil
 import struct
 import threading
+import time
 
 import pytest
 
@@ -284,8 +285,20 @@ def test_server_full_flow(server, data):
 def test_server_extract_demo(server, tmp_path):
     tree = _req(server, "GET", "/api/tree?demo=1")[1]
     assert len(tree["notebooks"]) == 3
-    r = _req(server, "POST", "/api/extract", {"demo": True, "out": "doar-retea", "sections": ["Proceduri IT/Rețea"]})[1]
+    started = _req(server, "POST", "/api/extract", {"demo": True, "out": "doar-retea",
+                                                   "sections": ["Proceduri IT/Rețea"]})[1]
+    for _ in range(200):  # extragerea rulează în fundal; progresul vine din /api/job
+        job = _req(server, "GET", f"/api/job?id={started['job']}")[1]
+        if job["state"] != "running":
+            break
+        time.sleep(0.05)
+    r = job["result"]
+    assert job["state"] == "done" and job["done"] == job["total"] > 0
     assert r["name"] == "doar-retea" and 0 < r["total"] < 80
+    assert any("Extragere gata" in line for line in job["log"])
+    log_ = _req(server, "GET", "/api/log")[1]
+    assert log_["local"].endswith("docaudit.log") and log_["shared"] is None  # testele nu copiază în Drive
+    assert _req(server, "POST", "/api/extract", {"demo": True, "out": "doar-retea", "wait": True})[1]["total"] == 80
     assert _req(server, "POST", "/api/extract", {"demo": True, "out": "../afara"})[0] == 400
     assert tree["notebooks"][0]["location"].startswith("https://exemplu.sharepoint.com/")
     link = "https://exemplu.sharepoint.com/sites/Echipa/Shared%20Documents/Proceduri%20IT/Re%C8%9Bea.one"
@@ -295,7 +308,7 @@ def test_server_extract_demo(server, tmp_path):
     assert not missing["found"] and missing["open_url"].startswith("onenote:https://exemplu.sharepoint.com/")
     assert _req(server, "POST", "/api/link", {"demo": True, "link": "javascript:alert(1)"})[0] == 400
     checks = _req(server, "GET", "/api/diagnose?demo=1")[1]["checks"]
-    assert [c["ok"] for c in checks] == [True, True]
+    assert [c["ok"] for c in checks] == [True, True, True]
 
     # ștergerea unei extrageri: doar cu confirmare, doar în folderul de date
     assert _req(server, "POST", "/api/dataset/delete", {"ds": "doar-retea"})[0] == 400

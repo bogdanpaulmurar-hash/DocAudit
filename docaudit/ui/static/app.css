@@ -134,3 +134,5 @@ ul.checks { list-style: none; padding: 0; margin: 6px 0 0; }
 ul.checks li { margin: 4px 0; }
 ul.checks .mark { display: inline-block; width: 1.2em; font-weight: 700; }
 ul.checks .fix { margin: 2px 0 0 1.5em; }
+pre.log { white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; max-height: 320px; overflow: auto; margin: 0; }
+progress { width: min(320px, 100%); height: 14px; }

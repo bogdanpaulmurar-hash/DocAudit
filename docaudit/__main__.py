@@ -104,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
     _utf8_output()
     if argv is None:
         argv = sys.argv[1:]
+    from . import log
+
+    log.setup()
+    if argv[:1] and not argv[0].startswith("-"):
+        log.get("cli").info("Comandă: %s", argv[0])  # doar numele comenzii, fără argumente (pot fi nume)
     if not argv:
         from .tray import run_app
 
@@ -329,6 +334,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     for e in report.errors:
         print(t("cli.extract.error", error=e))
+    if report.aborted:
+        print(t("cli.extract.aborted", error=report.aborted))
+        return 2
     print(t("cli.extract.done", total=report.total, fetched=report.fetched, reused=report.reused,
             skipped=report.skipped, removed=report.removed, path=out))
     return 1 if report.errors else 0

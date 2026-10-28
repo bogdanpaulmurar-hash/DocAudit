@@ -36,32 +36,23 @@ class ReadOnlyOneNote:
             import win32com.client  # type: ignore[import-not-found]  # noqa: F401
         except ImportError as e:  # pragma: no cover - doar pe Windows
             raise OneNoteError("pywin32 lipsește (pip install pywin32) sau sistemul nu e Windows") from e
-        from .connect import ConnectError, connect
+        from .connect import ComCaller, ConnectError, connect
 
-        self._missing = pythoncom.Missing
         try:  # pragma: no cover - doar pe Windows
-            self._app, self._how, self._problems = connect()
+            app, self._how, self._problems = connect()
         except ConnectError as e:  # pragma: no cover - doar pe Windows
             raise OneNoteError("OneNote desktop nu răspunde prin COM (e instalat OneNote din Microsoft 365 / "
                                "2016, nu doar „OneNote for Windows 10”?): " + str(e)) from e
+        self._call = ComCaller(app, pythoncom.Missing)  # pragma: no cover - doar pe Windows
 
     def get_hierarchy_xml(self) -> str:  # pragma: no cover - doar pe Windows
-        return self._call("GetHierarchy", ("", HS_PAGES, self._missing, XS_2013), ("", HS_PAGES))
+        return self._read("GetHierarchy", ("", HS_PAGES), (XS_2013,))
 
     def get_page_xml(self, page_id: str) -> str:  # pragma: no cover - doar pe Windows
-        return self._call("GetPageContent", (page_id, self._missing, PI_BINARY_DATA, XS_2013),
-                          (page_id, self._missing, PI_BINARY_DATA))
+        return self._read("GetPageContent", (page_id,), (PI_BINARY_DATA, XS_2013))
 
-    def _call(self, method: str, args: tuple, fallback: tuple) -> str:  # pragma: no cover
-        last: Exception | None = None
-        for a in (args, fallback):
-            try:
-                result = getattr(self._app, method)(*a)
-            except Exception as e:  # semnătura diferă între versiuni de pywin32/OneNote
-                last = e
-                continue
-            if isinstance(result, tuple):  # unele versiuni întorc (rezultat, ieșiri...)
-                result = next((r for r in result if isinstance(r, str) and r.startswith("<")), None)
-            if isinstance(result, str) and result.lstrip().startswith("<"):
-                return result
-        raise OneNoteError(f"{method} a eșuat: {last}")
+    def _read(self, method: str, before: tuple, after: tuple) -> str:  # pragma: no cover - doar pe Windows
+        try:
+            return self._call(method, before, after, xml=True)
+        except RuntimeError as e:
+            raise OneNoteError(str(e)) from e

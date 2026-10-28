@@ -246,6 +246,7 @@ async function viewSource() {
                  : h("p", { class: "muted", text: t("ui.source.link.openweb") }));
   }
 
+  // Extragerea rulează în fundal: notebook-urile mari au sute de pagini și durează minute.
   async function extract() {
     const picked = { notebooks: [], sections: [], pages: [] };
     treeBox.querySelectorAll("input[data-kind]:checked").forEach(cb => {
@@ -254,15 +255,51 @@ async function viewSource() {
       if (parentBox && parentBox !== cb && parentBox.checked) return; // inclus prin părinte
       picked[cb.dataset.kind].push(cb.dataset.value);
     });
-    out.textContent = t("ui.source.running");
-    await guard(async () => {
-      const r = await api("/api/extract", { demo: demo.checked, out: name.value, profile: profile.value || null,
+    let started;
+    try {
+      started = await api("/api/extract", { demo: demo.checked, out: name.value, profile: profile.value || null,
                                             full: full.checked, ...picked });
-      out.textContent = t("ui.source.done", r) + (r.errors.length ? " · " + r.errors.join("; ") : "");
-      S.ds = r.name; S.state = null; S.pages = {};
-      await reloadInfo();
-      toast(t("ui.source.next"));
-    });
+    } catch (e) {
+      out.replaceChildren(h("p", { class: "notice err", text: e.message }));
+      return;
+    }
+    const bar = h("progress", { max: "1", value: "0" });
+    const count = h("span", { class: "muted", text: t("ui.source.running") });
+    const stop = h("button", { text: t("ui.source.stop"), onclick: async () => {
+      stop.disabled = true;
+      await guard(() => api("/api/job/cancel", { id: started.job }));
+    } });
+    const lines = h("pre", { class: "log small" });
+    out.replaceChildren(h("div", { class: "stack" }, h("div", { class: "row" }, bar, count, stop), lines));
+    let job;
+    for (;;) {
+      await new Promise(r => setTimeout(r, 800));
+      try { job = await api("/api/job" + q({ id: started.job })); } catch (e) { continue; }
+      if (job.total) {
+        bar.max = String(job.total); bar.value = String(job.done);
+        count.textContent = t("ui.source.progress", { done: job.done, total: job.total });
+      }
+      lines.textContent = (job.log || []).join("\n");
+      if (job.state !== "running") break;
+    }
+    if (job.state === "error") {
+      out.replaceChildren(h("div", { class: "notice err" },
+        h("p", { text: t(job.error.error, job.error.params) }),
+        h("p", { class: "small", text: t("ui.source.seelog") }),
+        h("button", { onclick: () => runDiagnose(diagBox, demo.checked), text: t("ui.diag.run") }),
+        h("pre", { class: "log small", text: (job.log || []).join("\n") })));
+      return;
+    }
+    const r = job.result;
+    const parts = [h("p", { text: t(r.cancelled ? "ui.source.cancelled" : "ui.source.done", r) })];
+    if (r.total === 0) parts.push(h("p", { class: "notice err", text: t("ui.source.zero") }),
+      h("button", { onclick: () => runDiagnose(diagBox, demo.checked), text: t("ui.diag.run") }));
+    if (r.error_count) parts.push(h("details", {}, h("summary", { text: t("ui.source.errors", { count: r.error_count }) }),
+      h("ul", { class: "small" }, r.errors.map(e => h("li", { text: e })))));
+    out.replaceChildren(h("div", { class: "stack" }, ...parts));
+    S.ds = r.name; S.state = null; S.pages = {};
+    await reloadInfo();
+    if (r.total > 0) toast(t("ui.source.next"));
   }
 
   const list = S.info.datasets.length ? h("table", {},
@@ -337,7 +374,8 @@ async function viewAnalysis() {
   const value = h("strong", { text: Number(st.threshold).toFixed(2) });
   const slider = h("input", { type: "range", min: "0.30", max: "0.95", step: "0.05", value: st.threshold });
   slider.oninput = () => { value.textContent = Number(slider.value).toFixed(2); };
-  const semantic = h("input", { type: "checkbox", checked: st.semantic });
+  const semOk = S.info.semantic_available;
+  const semantic = h("input", { type: "checkbox", checked: st.semantic && semOk, disabled: !semOk });
   const scanBox = h("div");
   const out = h("p", { class: "muted" });
 
@@ -353,25 +391,32 @@ async function viewAnalysis() {
   }
 
   async function run() {
+    out.className = "muted";
     out.textContent = t("ui.analysis.running");
-    await guard(async () => {
+    try {
       await api("/api/settings", { threshold: Number(slider.value), semantic: semantic.checked });
       const r = await api("/api/analyze", { ds: S.ds, threshold: Number(slider.value), semantic: semantic.checked });
       out.textContent = t("ui.analysis.done", r);
       S.state = null; S.group = null;
       await reloadInfo();
       await openTab("groups");
-    });
+    } catch (e) { // eroarea rămâne în pagină, nu „Analizez…” la nesfârșit
+      out.className = "notice err";
+      out.textContent = e.message;
+    }
   }
 
+  const noPages = !current.pages;
   return h("div", { class: "card stack" },
     h("h1", { text: t("ui.analysis.title") }),
     h("p", { class: "muted", text: t("ui.analysis.help", { name: S.ds, pages: current.pages || 0 }) }),
+    noPages ? h("p", { class: "notice err", text: t("ui.analysis.nopages") }) : null,
     h("div", { class: "row" }, h("label", {}, t("ui.analysis.threshold"), " ", slider), value,
       h("button", { onclick: scan, text: t("ui.analysis.scan") })),
     h("p", { class: "small muted", text: t("ui.analysis.threshold.help") }),
     h("label", {}, semantic, " ", t("ui.analysis.semantic")),
-    h("div", {}, h("button", { class: "primary", onclick: run, text: t("ui.analysis.run") })),
+    semOk ? null : h("p", { class: "small muted", text: t("ui.analysis.semantic.missing") }),
+    h("div", {}, h("button", { class: "primary", onclick: run, disabled: noPages, text: t("ui.analysis.run") })),
     out, scanBox);
 }
 
@@ -665,6 +710,8 @@ async function viewSettings() {
     port: h("input", { type: "number", min: "1024", max: "65535", value: st.port }),
     semantic: h("input", { type: "checkbox", checked: st.semantic }),
     write_enabled: h("input", { type: "checkbox", checked: st.write_enabled }),
+    share_log: h("input", { type: "checkbox", checked: st.share_log }),
+    log_dir: h("input", { type: "text", value: st.log_dir || "", size: 40, placeholder: t("ui.settings.log_dir.auto") }),
   };
   const resetSettings = () => guard(async () => {
     if (!confirm(t("ui.settings.reset.confirm"))) return;
@@ -682,10 +729,11 @@ async function viewSettings() {
       threshold: Number(f.threshold.value), archive_section: f.archive_section.value.trim(),
       stale_prefix: f.stale_prefix.value, port: Number(f.port.value), semantic: f.semantic.checked,
       exclude_sections: f.exclude_sections.value.split(",").map(s => s.trim()).filter(Boolean),
-      write_enabled: f.write_enabled.checked,
+      write_enabled: f.write_enabled.checked, share_log: f.share_log.checked, log_dir: f.log_dir.value.trim(),
     });
     await reloadInfo();
     toast(t("ui.settings.saved"));
+    openTab("settings");
   });
   const row = (key, el, help) => h("tr", {}, h("th", { text: t("ui.settings." + key) }),
     h("td", {}, el, help ? h("div", { class: "small muted", text: t(help) }) : null));
@@ -697,10 +745,32 @@ async function viewSettings() {
       row("stale_prefix", f.stale_prefix),
       row("exclude_sections", f.exclude_sections, "ui.settings.exclude.help"),
       row("port", f.port, "ui.settings.port.help"),
-      row("write_enabled", f.write_enabled, "ui.settings.write.help")),
+      row("write_enabled", f.write_enabled, "ui.settings.write.help"),
+      row("share_log", f.share_log, "ui.settings.share_log.help"),
+      row("log_dir", f.log_dir, "ui.settings.log_dir.help")),
     h("div", { class: "row" }, h("button", { class: "primary", onclick: save, text: t("ui.settings.save") }),
       h("button", { onclick: resetSettings, text: t("ui.settings.reset") })),
-    h("p", { class: "small muted", text: t("ui.settings.local", { path: S.info.data_dir, version: S.info.version }) }));
+    h("p", { class: "small muted", text: t("ui.settings.local", { path: S.info.data_dir, version: S.info.version }) }),
+    await logCard());
+}
+
+// Logul tehnic: ce s-a rulat și ce n-a mers, fără conținutul paginilor.
+async function logCard() {
+  const box = h("pre", { class: "log small" });
+  const where = h("div", { class: "small muted" });
+  async function refresh() {
+    try {
+      const r = await api("/api/log");
+      where.replaceChildren(h("div", { text: t("ui.log.local", { path: r.local }) }),
+        h("div", { text: r.shared ? t("ui.log.shared", { path: r.shared }) : t("ui.log.noshared") }));
+      box.textContent = r.lines.join("\n") || t("ui.log.empty");
+      box.scrollTop = box.scrollHeight;
+    } catch (e) { box.textContent = e.message; }
+  }
+  await refresh();
+  return h("div", { class: "stack" }, h("h2", { text: t("ui.log.title") }),
+    h("p", { class: "small muted", text: t("ui.log.help") }), where, box,
+    h("div", {}, h("button", { onclick: refresh, text: t("ui.log.refresh") })));
 }
 
 boot().catch(e => {

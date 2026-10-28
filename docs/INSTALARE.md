@@ -76,7 +76,15 @@ DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în br
    - Același lucru din linia de comandă: `DocAudit.bat diagnose`. Lista notebook-urilor cu adresa lor: `DocAudit.bat tree`; un link anume: `DocAudit.bat tree --link "<link>"`.
 3. Fără COM (de exemplu blocat de IT): exportă paginile din OneNote ca .docx sau .mht și folosește `DocAudit.bat import-files <folder>`.
 
-## 8. Limbă și curățenie
+## 8. Notebook mare și logul tehnic
+- Extragerea rulează în fundal, cu „Pagina N din M” și butonul **Oprește**. Ce s-a citit se salvează la fiecare 50 de pagini; „Extrage” din nou continuă de unde a rămas (paginile neschimbate nu se mai cer din OneNote).
+- Dacă primele pagini nu se pot citi deloc, extragerea se oprește singură după 5 încercări, cu eroarea afișată, în loc să încerce sute de pagini.
+- **Logul tehnic** (Setări → Log tehnic) arată ce a făcut DocAudit: câte pagini, cât a durat, ce eroare a dat OneNote. Nu conține titluri, nume de notebook-uri sau text din pagini.
+  - local: `%LOCALAPPDATA%\DocAudit\data\logs\docaudit.log`;
+  - copie: `G:\My Drive\Dev\DocAudit\logs\pc-xxxxxx.log` (un fișier pe laptop), ca să o pot citi din Google Drive. Se oprește din Setări („Copie a logului în Google Drive”); folderul se poate schimba tot de acolo.
+- După primul scan pe un notebook real, spune-mi doar „am rulat”: citesc logul din Drive.
+
+## 9. Limbă și curățenie
 - Limba se schimbă din interfață. În linia de comandă: `set DOCAUDIT_LANG=en` sau `set DOCAUDIT_LANG=de` înainte de comenzi.
 - Notebook-ul de test se închide din OneNote (clic dreapta → Închide acest notebook), iar folderul lui se poate șterge manual.
 - Dezinstalare: șterge folderul `%LOCALAPPDATA%\DocAudit` (dispar și datele extrase) și scurtăturile DocAudit.
