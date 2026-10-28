@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import secrets
+import sys
 import threading
 import webbrowser
 from http import HTTPStatus
@@ -51,8 +52,8 @@ def _dataset(name: str | None) -> Path:
 
 
 def _ui_texts(lang: str) -> dict[str, str]:
-    base = {k: v for k, v in _load("ro").items() if k.startswith(("ui.", "cli.compare.", "apply."))}
-    base.update({k: v for k, v in _load(lang).items() if k.startswith(("ui.", "cli.compare.", "apply."))})
+    base = {k: v for k, v in _load("ro").items() if k.startswith(("ui.", "cli.compare.", "apply.", "diag."))}
+    base.update({k: v for k, v in _load(lang).items() if k.startswith(("ui.", "cli.compare.", "apply.", "diag."))})
     return base
 
 
@@ -117,6 +118,19 @@ def api_tree(q: dict) -> dict:
     return {"notebooks": [{"name": nb.name, "location": nb.location, "sections": [
         {"path": "/".join(s.path), "pages": [{"id": p.id, "title": p.title, "modified": p.modified} for p in s.pages]}
         for s in nb.sections]} for nb in h.notebooks]}
+
+
+def api_diagnose(q: dict) -> dict:
+    """Verifică pe rând legătura cu OneNote (doar citire)."""
+    from ..extract.diagnose import diagnose
+
+    if q.get("demo") == "1":
+        from ..extract.demo import DemoOneNote
+
+        checks = diagnose(DemoOneNote, windows_checks=False)
+    else:
+        checks = diagnose()
+    return {"checks": [c.to_dict() for c in checks]}
 
 
 def api_link(body: dict) -> dict:
@@ -266,6 +280,27 @@ def api_restore(body: dict) -> dict:
         raise ApiError(409, "ui.error.restore", error=str(e))
 
 
+def api_delete_dataset(body: dict) -> dict:
+    """Șterge o extragere din folderul de date (doar local; OneNote nu e atins)."""
+    import shutil
+
+    if body.get("confirm") is not True:
+        raise ApiError(400, "ui.error.confirm")
+    folder = _dataset(body.get("ds"))
+    if folder.resolve().parent != data_dir().resolve():
+        raise ApiError(400, "ui.error.dataset")
+    shutil.rmtree(folder)
+    return {"deleted": folder.name}
+
+
+def api_reset_settings(body: dict) -> dict:
+    """Setările implicite (scrierea în OneNote oprită). Extragerile rămân."""
+    from ..settings import Settings, save_settings
+
+    save_settings(Settings())
+    return Settings().to_dict()
+
+
 def api_settings(body: dict) -> dict:
     try:
         return update_settings(body).to_dict()
@@ -274,18 +309,20 @@ def api_settings(body: dict) -> dict:
 
 
 GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_state, "/api/page": api_page,
-              "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied}
+              "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied,
+              "/api/diagnose": api_diagnose}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,
-               "/api/settings": api_settings, "/api/link": api_link}
-WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore"}
+               "/api/settings": api_settings, "/api/link": api_link,
+               "/api/dataset/delete": api_delete_dataset, "/api/settings/reset": api_reset_settings}
+WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore", "/api/dataset/delete"}
 
 
 # ---------- serverul ----------
 
 class Handler(BaseHTTPRequestHandler):
     server: "DocAuditServer"
-    server_version = "DocAudit"
+    server_version = f"DocAudit/{__version__}"
     sys_version = ""
 
     def log_message(self, fmt: str, *args: object) -> None:  # fără jurnal în consolă (pythonw)
@@ -357,6 +394,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": "ui.error.token"})
         if not self._token_ok({}):  # la POST jetonul vine doar în antet
             return self._json(403, {"error": "ui.error.token"})
+        if path == "/api/quit":  # o pornire nouă (altă versiune) îi cere celei vechi să se închidă
+            self._json(200, {"ok": True})
+            threading.Thread(target=self.server.quit, daemon=True).start()
+            return
         fn = POST_ROUTES.get(path)
         if fn is None:
             return self._json(404, {"error": "ui.error.notfound"})
@@ -415,12 +456,25 @@ class Handler(BaseHTTPRequestHandler):
 
 class DocAuditServer(ThreadingHTTPServer):
     daemon_threads = True
+    # Pe Windows SO_REUSEADDR lasă două servere pe același port: a doua pornire n-ar mai vedea prima.
+    allow_reuse_address = sys.platform != "win32"
 
     def __init__(self, host: str, port: int) -> None:
         if not is_loopback(host):
             raise ValueError(f"DocAudit ascultă doar local, nu pe {host}")
         self.token = secrets.token_urlsafe(24)
         super().__init__((host, port), Handler)
+
+        self.on_quit = None  # tray: oprește și iconița
+
+    def quit(self) -> None:
+        if self.on_quit is not None:
+            try:
+                self.on_quit()
+            except Exception:
+                pass
+        self.shutdown()
+        self.server_close()  # eliberează portul pentru pornirea nouă
 
     @property
     def url(self) -> str:

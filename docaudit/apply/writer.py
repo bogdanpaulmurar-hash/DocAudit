@@ -49,15 +49,16 @@ class ComOneNote:  # pragma: no cover - doar pe Windows, cu OneNote desktop
     def __init__(self) -> None:
         try:
             import pythoncom  # type: ignore[import-not-found]
-            import win32com.client  # type: ignore[import-not-found]
+            import win32com.client  # type: ignore[import-not-found]  # noqa: F401
         except ImportError as e:
             raise OneNoteError("pywin32 lipsește sau sistemul nu e Windows") from e
-        pythoncom.CoInitialize()
+        from ..extract.connect import ConnectError, connect
+
         self._missing = pythoncom.Missing
         try:
-            self._app = win32com.client.gencache.EnsureDispatch("OneNote.Application")
-        except Exception as e:
-            raise OneNoteError("OneNote desktop nu răspunde prin COM") from e
+            self._app, self._how, _ = connect()
+        except ConnectError as e:
+            raise OneNoteError(f"OneNote desktop nu răspunde prin COM: {e}") from e
 
     @staticmethod
     def _out(result):

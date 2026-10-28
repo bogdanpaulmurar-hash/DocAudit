@@ -69,3 +69,40 @@ def test_cli_tree_link(capsys):
     assert "Proceduri IT/Hardware" in capsys.readouterr().out
     assert main(["tree", "--demo", "--link", f"{SITE}/Shared%20Documents/Altceva"]) == 1
     assert "onenote:https://" in capsys.readouterr().out
+
+
+# ---------- „Verifică legătura cu OneNote” ----------
+
+def test_diagnose_steps():
+    from docaudit.extract.com import OneNoteError
+    from docaudit.extract.diagnose import diagnose
+
+    ok = diagnose(DemoOneNote, windows_checks=False)
+    assert [c.key for c in ok] == ["com", "notebooks"] and all(c.ok for c in ok)
+    assert ok[-1].detail.startswith("3: ")
+
+    def broken():
+        raise OneNoteError("OneNote desktop nu răspunde prin COM")
+
+    bad = diagnose(broken, windows_checks=False)
+    assert [(c.key, c.ok) for c in bad] == [("com", False), ("notebooks", None)] and "COM" in bad[0].detail
+
+    class Empty:
+        def get_hierarchy_xml(self):
+            return '<one:Notebooks xmlns:one="http://schemas.microsoft.com/office/onenote/2013/onenote"/>'
+
+    assert diagnose(Empty, windows_checks=False)[-1].ok is False
+
+
+def test_diagnose_off_windows_and_cli(capsys, monkeypatch):
+    import sys
+
+    from docaudit.extract.diagnose import diagnose
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    checks = diagnose()
+    assert checks[0].key == "system" and checks[0].ok is False and all(c.ok is None for c in checks[1:])
+    assert main(["diagnose", "--demo"]) == 0
+    assert "[OK ]" in capsys.readouterr().out
+    assert main(["diagnose"]) == 1
+    assert "[NU ]" in capsys.readouterr().out

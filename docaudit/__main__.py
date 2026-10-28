@@ -123,6 +123,9 @@ def main(argv: list[str] | None = None) -> int:
     p_tree.add_argument("--demo", action="store_true", help=t("cli.extract.demo"))
     p_tree.add_argument("--link", help=t("cli.tree.link"))
 
+    p_diag = sub.add_parser("diagnose", help=t("cli.diagnose.help"))
+    p_diag.add_argument("--demo", action="store_true", help=t("cli.extract.demo"))
+
     p_ext = sub.add_parser("extract", help=t("cli.extract.help"))
     _add_selection_args(p_ext)
     p_ext.add_argument("--profile", help=t("cli.select.profile"))
@@ -268,6 +271,22 @@ def main(argv: list[str] | None = None) -> int:
         print(t("cli.extract.done", total=report.total, fetched=report.fetched, reused=report.reused,
                 skipped=report.skipped, removed=report.removed, path=out))
         return 1 if report.errors else 0
+
+    if args.cmd == "diagnose":
+        from .extract.diagnose import diagnose
+
+        if args.demo:
+            from .extract.demo import DemoOneNote
+
+            checks = diagnose(DemoOneNote, windows_checks=False)
+        else:
+            checks = diagnose()
+        for c in checks:
+            mark = {True: "OK ", False: "NU ", None: " - "}[c.ok]
+            print(f"[{mark}] {t('diag.' + c.key)}" + (f": {c.detail}" if c.detail else ""))
+            if c.ok is False:
+                print("       → " + t(f"diag.{c.key}.fix"))
+        return 0 if all(c.ok for c in checks) else 1
 
     # tree / extract au nevoie de OneNote (sau de demo)
     from .extract.com import OneNoteError

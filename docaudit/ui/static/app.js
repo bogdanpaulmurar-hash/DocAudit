@@ -134,7 +134,36 @@ async function openTab(tab) {
   await guard(async () => {
     const render = { source: viewSource, analysis: viewAnalysis, groups: viewGroups, apply: viewApply,
                      journal: viewJournal, settings: viewSettings }[tab];
-    view.replaceChildren(await render());
+    view.replaceChildren(guide(tab), await render());
+  });
+}
+
+// Pașii „Cum fac?” de pe fiecare ecran. Deschiși până când îi închizi (ținut minte în browser).
+function guide(tab) {
+  const key = "docaudit.guide." + tab;
+  let open = true;
+  try { open = localStorage.getItem(key) !== "closed"; } catch (e) { /* fără stocare: deschis */ }
+  const box = h("details", { class: "card guide", open },
+    h("summary", {}, h("strong", { text: t("ui.guide.title") })),
+    h("ol", {}, t("ui.guide." + tab).split("\n").map(step => h("li", { text: step }))));
+  box.addEventListener("toggle", () => {
+    try { localStorage.setItem(key, box.open ? "open" : "closed"); } catch (e) { /* ignorat */ }
+  });
+  return box;
+}
+
+// „Verifică legătura cu OneNote”: fiecare pas cu ✓ / ✗ și ce e de făcut la cel care pică.
+async function runDiagnose(box, demo) {
+  box.replaceChildren(h("p", { class: "muted", text: t("ui.loading") }));
+  await guard(async () => {
+    const r = await api("/api/diagnose" + q({ demo: demo ? "1" : "0" }));
+    const allOk = r.checks.every(c => c.ok);
+    box.replaceChildren(h("div", { class: "notice" + (allOk ? "" : " err") },
+      h("p", {}, h("strong", { text: t(allOk ? "ui.diag.ok" : "ui.diag.fail") })),
+      h("ul", { class: "checks" }, r.checks.map(c => h("li", {},
+        h("span", { class: "mark", text: c.ok === true ? "✓" : c.ok === false ? "✗" : "–" }), " ",
+        h("strong", { text: t("diag." + c.key) }), c.detail ? h("span", { class: "muted", text: " · " + c.detail }) : null,
+        c.ok === false ? h("div", { class: "fix", text: t("diag." + c.key + ".fix") }) : null)))));
   });
 }
 
@@ -164,6 +193,7 @@ async function viewSource() {
   const out = h("div", { class: "muted" });
   demo.onchange = () => { if (demo.checked && name.value === "onenote") name.value = "demo"; };
 
+  const diagBox = h("div", {});
   const link = h("input", { type: "text", placeholder: t("ui.source.link.placeholder"), size: 48 });
   const linkOut = h("div", { class: "small" });
 
@@ -176,7 +206,8 @@ async function viewSource() {
       S.tree = null;
       treeBox.replaceChildren(h("div", { class: "notice err" },
         h("p", {}, h("strong", { text: t("ui.source.treefail") })), h("p", { text: e.message }),
-        h("p", { class: "small", text: t("ui.source.treehelp") })));
+        h("p", { class: "small", text: t("ui.source.treehelp") }),
+        h("button", { onclick: () => runDiagnose(diagBox, demo.checked), text: t("ui.diag.run") })));
       return false;
     }
     treeBox.replaceChildren(S.tree.notebooks.length ? renderTree(S.tree)
@@ -235,18 +266,21 @@ async function viewSource() {
   }
 
   const list = S.info.datasets.length ? h("table", {},
-    h("tr", {}, ["ui.col.name", "ui.col.pages", "ui.col.extracted", "ui.col.status"].map(k => h("th", { text: t(k) }))),
+    h("tr", {}, ["ui.col.name", "ui.col.pages", "ui.col.extracted", "ui.col.status", ""].map(k => h("th", { text: k ? t(k) : "" }))),
     S.info.datasets.map(d => h("tr", {},
       h("td", {}, h("button", { class: "ghost", onclick: () => { S.ds = d.name; S.state = null; renderChrome(); openTab(d.compared ? "groups" : "analysis"); }, text: d.name })),
       h("td", { text: d.pages }), h("td", { text: fmtDate(d.extracted_at) }),
-      h("td", { text: d.compared ? t("ui.status.compared") : d.grouped ? t("ui.status.grouped") : t("ui.status.extracted") }))))
+      h("td", { text: d.compared ? t("ui.status.compared") : d.grouped ? t("ui.status.grouped") : t("ui.status.extracted") }),
+      h("td", {}, h("button", { class: "ghost", onclick: () => removeDataset(d.name), text: t("ui.source.delete") })))))
     : h("p", { class: "muted", text: t("ui.nodata.long") });
 
   return h("div", { class: "stack" },
     h("div", { class: "card stack" }, h("h1", { text: t("ui.source.title") }), h("p", { class: "muted", text: t("ui.source.help") }),
       h("div", { class: "row" },
         h("label", {}, demo, " ", t("ui.source.demo")),
-        h("button", { onclick: loadTree, text: t("ui.source.tree") })),
+        h("button", { onclick: loadTree, text: t("ui.source.tree") }),
+        h("button", { onclick: () => runDiagnose(diagBox, demo.checked), text: t("ui.diag.run") })),
+      diagBox,
       treeBox,
       h("div", { class: "stack" },
         h("div", { class: "row" },
@@ -262,6 +296,18 @@ async function viewSource() {
       h("p", { class: "small muted", text: t("ui.source.where", { path: S.info.data_dir }) }),
       out),
     h("div", { class: "card" }, h("h2", { text: t("ui.source.datasets") }), list));
+}
+
+// Șterge doar datele locale ale unei extrageri (pagini, grupuri, decizii). OneNote nu e atins.
+async function removeDataset(name) {
+  if (!confirm(t("ui.source.delete.confirm", { name }))) return;
+  await guard(async () => {
+    await api("/api/dataset/delete", { ds: name, confirm: true });
+    if (S.ds === name) { S.ds = null; S.state = null; S.pages = {}; }
+    await reloadInfo();
+    toast(t("ui.source.delete.done", { name }));
+    openTab("source");
+  });
 }
 
 function renderTree(tree) {
@@ -620,6 +666,13 @@ async function viewSettings() {
     semantic: h("input", { type: "checkbox", checked: st.semantic }),
     write_enabled: h("input", { type: "checkbox", checked: st.write_enabled }),
   };
+  const resetSettings = () => guard(async () => {
+    if (!confirm(t("ui.settings.reset.confirm"))) return;
+    await api("/api/settings/reset", {});
+    await reloadInfo();
+    toast(t("ui.settings.reset.done"));
+    openTab("settings");
+  });
   const save = () => guard(async () => {
     if (f.write_enabled.checked && !st.write_enabled && !confirm(t("ui.settings.write.confirm"))) {
       f.write_enabled.checked = false;
@@ -645,7 +698,8 @@ async function viewSettings() {
       row("exclude_sections", f.exclude_sections, "ui.settings.exclude.help"),
       row("port", f.port, "ui.settings.port.help"),
       row("write_enabled", f.write_enabled, "ui.settings.write.help")),
-    h("div", {}, h("button", { class: "primary", onclick: save, text: t("ui.settings.save") })),
+    h("div", { class: "row" }, h("button", { class: "primary", onclick: save, text: t("ui.settings.save") }),
+      h("button", { onclick: resetSettings, text: t("ui.settings.reset") })),
     h("p", { class: "small muted", text: t("ui.settings.local", { path: S.info.data_dir, version: S.info.version }) }));
 }
 
