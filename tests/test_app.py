@@ -401,3 +401,71 @@ def test_server_extract_cancel_kills_hung_worker(server, monkeypatch):
     job = _wait_job(server, started["job"])
     assert job["state"] == "done" and job["result"]["cancelled"]
     assert _req(server, "POST", "/api/extract", {"demo": True, "out": "oprit", "wait": True})[0] == 200
+
+
+# ---------- „Mută…”: în altă secțiune, aleasă de utilizator ----------
+
+def test_move_to_chosen_section_and_restore(data):
+    from docaudit.decisions import make_target
+
+    writer = writer_for(data)
+    before = _where(writer)
+    sec, title = before["sample-p024"]
+    from docaudit.model import read_pages
+
+    pages = read_pages(data)
+    notebook = next(p.notebook for p in pages if p.id == "sample-p024")
+    other = next("/".join(p.section_path) for p in pages
+                 if p.notebook == notebook and "/".join(p.section_path) != sec)
+    j = Journal(data)
+    with pytest.raises(ValueError):
+        j.add("sample-p024", "move")  # fără secțiune
+    d = j.add("sample-p024", "move", target=make_target(notebook, other), note="secțiune greșită")
+    nb27 = next(p.notebook for p in pages if p.id == "sample-p027")
+    same = j.add("sample-p027", "move", target=make_target(nb27, before["sample-p027"][0]))
+    gone = j.add("sample-p005", "move", target=make_target(notebook, "Nu există"))
+    settings = Settings(write_enabled=True)
+    items = {i.decision_id: i for i in plan(data, writer, settings)}
+    assert items[d.id].status == "ready" and items[d.id].target == other
+    assert (items[same.id].status, items[same.id].reason) == ("skip", "already_there")
+    assert (items[gone.id].status, items[gone.id].reason) == ("skip", "no_target")
+    result = apply(data, writer, settings, [d.id])
+    assert len(result.done) == 1 and not result.errors
+    after = _where(writer)
+    assert "sample-p024" not in after  # originalul e în Coș
+    moved = [pid for pid, (s, tl) in after.items() if s == other and tl == title]
+    assert len(moved) == 1
+    page, _ = parse_page(writer.get_page_xml(moved[0]), "", [])
+    assert page.blocks[0].text.startswith(f"Mutat din: {sec}") and "secțiune greșită" in page.blocks[0].text
+    st = build_state(data)
+    assert not [x for x in st["pending"] if x["id"] == d.id]
+    row = next(r for r in Journal(data).applied() if r["decision_id"] == d.id)
+    assert row["action"] == "move"
+    restore(data, writer, settings, row["id"])
+    assert (sec, title) in _where(writer).values() and not [p for p in _where(writer) if p == moved[0]]
+
+
+def test_journal_migrates_old_db_without_target(tmp_path):
+    import sqlite3
+
+    db = sqlite3.connect(tmp_path / "decisions.db")
+    db.executescript("""CREATE TABLE decisions (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL,
+        user TEXT NOT NULL, page_id TEXT NOT NULL, group_id TEXT NOT NULL DEFAULT '', action TEXT NOT NULL,
+        finding TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', undone_at TEXT, applied_at TEXT);
+        INSERT INTO decisions (created_at, user, page_id, action) VALUES ('2026-10-01T00:00:00Z', 'x', 'p', 'archive');""")
+    db.commit()
+    db.close()
+    j = Journal(tmp_path)
+    assert j.current()["p"].target == "" and j.add("q", "move", target="NB\tS").target == "NB\tS"
+
+
+def test_server_sections_and_move_decision(server, data):
+    secs = _req(server, "GET", "/api/sections?ds=demo")[1]
+    assert secs["live"] and {"notebook", "section"} <= set(secs["sections"][0])
+    target = secs["sections"][0]["notebook"] + "\t" + secs["sections"][-1]["section"]
+    assert _req(server, "POST", "/api/decision", {"ds": "demo", "page": "sample-p024", "action": "move"})[0] == 400
+    r = _req(server, "POST", "/api/decision", {"ds": "demo", "page": "sample-p024", "action": "move", "target": target})
+    assert r[0] == 200 and r[1]["target"] == target
+    st = _req(server, "GET", "/api/state?ds=demo")[1]
+    page = next(p for g in st["groups"] for p in g["pages"] if p["id"] == "sample-p024")
+    assert page["decision"] == "move" and page["decision_target"].endswith(secs["sections"][-1]["section"])

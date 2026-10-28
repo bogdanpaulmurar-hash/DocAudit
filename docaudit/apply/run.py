@@ -5,6 +5,7 @@ Reguli (din CLAUDE.md):
 - întâi previzualizarea (plan); se aplică doar deciziile confirmate din previzualizare;
 - înainte de orice scriere, XML-ul complet al paginii se salvează în copii de siguranță;
 - arhivare = copie în secțiunea „Arhivă” cu nota „Mutat din …” + originalul în Coșul OneNote;
+- mutare în altă secțiune (aleasă de utilizator) = la fel, doar că ținta e secțiunea aleasă;
 - o pagină modificată în OneNote după extragere nu se atinge (se cere o extragere nouă).
 """
 
@@ -16,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..decisions import Journal
+from ..decisions import Journal, split_target
 from ..extract.onenote_xml import parse_hierarchy
 from ..i18n import t
 from ..model import read_pages
@@ -38,9 +39,10 @@ class PlanItem:
     title: str
     notebook: str
     section: str
-    target: str  # secțiunea de arhivă sau noul titlu
+    target: str  # secțiunea de arhivă, secțiunea aleasă la mutare sau noul titlu
     status: str  # ready | skip
-    reason: str = ""  # cheie: missing, changed, already_archived, already_marked, create_section
+    reason: str = ""  # cheie: missing, changed, already_archived, already_marked, create_section,
+    #                   already_there, no_target
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -80,6 +82,16 @@ def _archive_section(writer: WritableOneNote, notebook_id: str, name: str) -> st
     return None
 
 
+def _section_by_path(writer: WritableOneNote, notebook: str, path: str) -> str | None:
+    """Id-ul secțiunii „path” din notebook-ul „notebook” (după nume), dacă există acum în OneNote."""
+    for nb in parse_hierarchy(writer.get_hierarchy_xml()).notebooks:
+        if nb.name == notebook:
+            for sec in nb.sections:
+                if "/".join(sec.path) == path:
+                    return sec.id
+    return None
+
+
 def plan(folder: Path, writer: WritableOneNote, settings: Settings) -> list[PlanItem]:
     """Ce s-ar întâmpla la „Aplică”. Doar citește din OneNote."""
     journal = Journal(folder)
@@ -97,6 +109,15 @@ def plan(folder: Path, writer: WritableOneNote, settings: Settings) -> list[Plan
                     notebook=loc["notebook"], section=loc["section"])
         if page is not None and page.modified != loc["modified"]:
             items.append(PlanItem(**base, target="", status="skip", reason="changed"))
+        elif d.action == "move":
+            nb_name, sec_path = split_target(d.target)
+            shown = f"{nb_name} › {sec_path}" if nb_name != loc["notebook"] else sec_path
+            if nb_name == loc["notebook"] and sec_path == loc["section"]:
+                items.append(PlanItem(**base, target=shown, status="skip", reason="already_there"))
+            elif not _section_by_path(writer, nb_name, sec_path):
+                items.append(PlanItem(**base, target=shown, status="skip", reason="no_target"))
+            else:
+                items.append(PlanItem(**base, target=shown, status="ready"))
         elif d.action == "archive":
             if loc["section"] == settings.archive_section:
                 items.append(PlanItem(**base, target=settings.archive_section, status="skip",
@@ -149,15 +170,21 @@ def apply(folder: Path, writer: WritableOneNote, settings: Settings, decision_id
             backup = _backup(xml, item.page_id, {**item.to_dict(), "section_id": loc["section_id"],
                                                  "notebook_id": loc["notebook_id"]})
             d = decisions[item.decision_id]
-            if item.action == "archive":
-                section_id = _archive_section(writer, loc["notebook_id"], settings.archive_section) \
-                    or writer.create_section(loc["notebook_id"], settings.archive_section)
+            if item.action in ("archive", "move"):
+                if item.action == "move":
+                    section_id = _section_by_path(writer, *split_target(d.target))
+                    if not section_id:
+                        result.skipped.append({**item.to_dict(), "reason": "no_target"})
+                        continue
+                else:
+                    section_id = _archive_section(writer, loc["notebook_id"], settings.archive_section) \
+                        or writer.create_section(loc["notebook_id"], settings.archive_section)
                 new_id = writer.create_page(section_id)
                 note = t("apply.note", lang, section=item.section, date=_today(),
                          reason=d.note or t("apply.reason.default", lang))
                 writer.update_page(copy_page_xml(xml, new_id, note))
                 writer.delete_page(item.page_id)  # în Coșul OneNote, recuperabilă
-                journal.record_applied(d.id, "archive", item.page_id, item.title, notebook_id=loc["notebook_id"],
+                journal.record_applied(d.id, item.action, item.page_id, item.title, notebook_id=loc["notebook_id"],
                                        section_id=loc["section_id"], section=item.section, new_page_id=new_id,
                                        backup=str(backup))
             else:
@@ -178,7 +205,7 @@ def apply(folder: Path, writer: WritableOneNote, settings: Settings, decision_id
 
 def restore(folder: Path, writer: WritableOneNote, settings: Settings, applied_id: int,
             lang: str | None = None) -> dict:
-    """Întoarce o pagină arhivată în secțiunea ei sau scoate prefixul „[ÎNVECHIT]”."""
+    """Întoarce o pagină arhivată / mutată în secțiunea ei sau scoate prefixul „[ÎNVECHIT]”."""
     if not settings.write_enabled:
         raise WriteDisabled(t("apply.disabled", lang))
     journal = Journal(folder)
@@ -186,7 +213,7 @@ def restore(folder: Path, writer: WritableOneNote, settings: Settings, applied_i
     if row is None or row["restored_at"]:
         raise ValueError(t("apply.restore.none", lang))
     where = _locate(writer)
-    if row["action"] == "archive":
+    if row["action"] in ("archive", "move"):
         if row["new_page_id"] not in where:
             raise ValueError(t("apply.restore.missing", lang))
         if not any(loc["section_id"] == row["section_id"] for loc in where.values()) and \
@@ -227,4 +254,10 @@ def writer_for(folder: Path, lang: str | None = None) -> WritableOneNote:
         return FakeOneNote(path) if path.is_file() else FakeOneNote.from_sample(path)
     if source.kind != "onenote_com":
         raise WriteDisabled(t("apply.notonenote", lang))
-    return ComOneNote()  # pragma: no cover - Windows
+    from ..extract.psbridge import BridgeUnavailable  # pragma: no cover - Windows
+    from .pswriter import PowerShellWriter  # pragma: no cover - Windows
+
+    try:  # pragma: no cover - Windows
+        return PowerShellWriter()  # aceeași cale ca la citire; prin pywin32 OneNote cădea pe unele laptopuri
+    except BridgeUnavailable:  # pragma: no cover - Windows
+        return ComOneNote()

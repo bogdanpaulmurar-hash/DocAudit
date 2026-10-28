@@ -29,7 +29,7 @@ Fiecare ecran are sus „Cum fac?”, cu pașii lui.
 Ecranele:
 1. **Sursă**: bifezi notebook-urile, secțiunile sau paginile și apeși „Extrage”. „Arhivă” e exclusă implicit.
 2. **Analiză**: pragul de asemănare, cu tabelul „câte grupuri la fiecare prag”, apoi „Rulează analiza”.
-3. **Grupuri**: în stânga grupurile, ordonate după gravitate, cu filtre. În dreapta, constatările și paginile una lângă alta, cu valorile diferite evidențiate. Sub fiecare pagină ai deciziile: Referință, Învechită, Arhivează, Lasă așa, Nu e în grup și Notă. Taste: `J`/`K` grupul următor / anterior, `1`–`9` alegi pagina, `R` / `O` / `A` / `I` decizi. Raportul se descarcă în HTML, CSV (Excel) sau Markdown.
+3. **Grupuri**: în stânga grupurile, ordonate după gravitate, cu filtre. În dreapta, constatările și paginile una lângă alta, cu valorile diferite evidențiate. Sub fiecare pagină ai deciziile: Referință, Învechită, Arhivează, Mută… (în altă secțiune: se deschide lista secțiunilor, cu căutare; dublu clic sau „Mută aici”), Lasă așa, Nu e în grup și Notă. Taste: `J`/`K` grupul următor / anterior, `1`–`9` alegi pagina, `R` / `O` / `A` / `I` decizi. Raportul se descarcă în HTML, CSV (Excel) sau Markdown.
 4. **De aplicat**: previzualizarea exactă („pagina X se mută din Rețea în Arhivă”, „titlu nou: [ÎNVECHIT] …”) și butonul „Aplică”.
 5. **Arhivă și jurnal**: ce s-a aplicat, cu „Restaurează”, și toate deciziile, cu „Anulează”.
 6. **Setări**: prag, secțiunea de arhivă, prefixul, secțiunile excluse, portul și **„Permite scrierea în OneNote”** (oprită implicit).
@@ -54,7 +54,7 @@ Pașii ating doar un notebook nou, creat cu eșantionul fictiv. Notebook-urile r
    - Din linia de comandă: `DocAudit.bat extract --notebook "DocAudit Test" --out test`, apoi `DocAudit.bat check-sample test` → „0 diferențe față de eșantion”. Dacă apar diferențe, trimite-mi lista: e fictivă și se poate copia.
 4. Extrage din nou → „0 citite, 80 neschimbate”. Modifică un cuvânt într-o pagină din „DocAudit Test” și extrage → „1 citite, 79 neschimbate”.
 5. **Analiză** → aceleași 15 grupuri. **Grupuri** → aceleași conflicte. Dintre paginile învechite apar doar cele cu versiune mai mică sau cu „nu mai folosiți” în text, pentru că în notebook-ul de test toate paginile au data de azi.
-6. **Scriere, doar în „DocAudit Test”**: alege „Arhivează” pe o pagină și „Învechită” pe alta. În **Setări** pornește scrierea, apoi **De aplicat** → „Aplică”.
+6. **Scriere, doar în „DocAudit Test”**: alege „Arhivează” pe o pagină, „Mută…” pe alta (într-o altă secțiune a notebook-ului de test) și „Învechită” pe a treia. În **Setări** pornește scrierea, apoi **De aplicat** → „Aplică”.
    - În OneNote: prima pagină e acum în secțiunea „Arhivă” a notebook-ului „DocAudit Test”, cu nota „Mutat din: …” la început, iar originalul e în Coșul notebook-ului. Verifică imaginile, tabelele și listele.
    - A doua pagină are titlul „[ÎNVECHIT] …”.
    - În `%LOCALAPPDATA%\DocAudit\data\_backups` există câte o copie XML pentru fiecare pagină.

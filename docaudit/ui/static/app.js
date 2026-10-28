@@ -509,20 +509,26 @@ async function renderGroup() {
     if (g.reference === p.id) badges.push(h("span", { class: "badge b-ok", text: t("ui.badge.reference") }));
     if (staleIds.has(p.id)) badges.push(h("span", { class: "badge sev-medium", text: t("ui.badge.stale") }));
     if (g.other_language.includes(p.id)) badges.push(h("span", { class: "badge b-accent", text: t("ui.badge.language") }));
-    if (p.decision) badges.push(h("span", { class: "badge b-accent", text: "✓ " + t("ui.action." + p.decision) }));
+    if (p.decision) badges.push(h("span", { class: "badge b-accent",
+      text: "✓ " + t("ui.action." + p.decision) + (p.decision_target ? " " + p.decision_target : "") }));
     const btn = (action, key) => h("button", { class: p.decision === action ? "on" : "", title: key ? `${key}` : "",
       text: t("ui.action." + action), onclick: () => decide(p.id, action) });
+    const picker = h("div");
     return h("div", { class: "card pcol" + (i === S.focus ? " focus" : ""), "data-i": i, onclick: () => setFocus(i) },
       h("h3", { text: `${i + 1}. ${p.title}` }),
       h("div", { class: "meta", text: `${p.notebook} › ${p.section} · ${t("ui.modified")} ${fmtDate(p.modified)}` }),
       h("div", { class: "row" }, badges),
-      h("div", { class: "actions" }, btn("reference", "R"), btn("mark_stale", "O"), btn("archive", "A"), btn("keep", "I"),
+      h("div", { class: "actions" }, btn("reference", "R"), btn("mark_stale", "O"), btn("archive", "A"),
+        h("button", { class: p.decision === "move" ? "on" : "", title: "M", text: t("ui.action.move"),
+                      onclick: () => movePicker(p, picker) }),
+        btn("keep", "I"),
         h("button", { text: t("ui.action.not_in_group"), onclick: () => decide(p.id, "not_in_group") }),
         h("button", { text: t("ui.action.note"), onclick: () => {
           const note = prompt(t("ui.note.prompt"));
           if (note) decide(p.id, "note", { note });
         } }),
         p.decision_id ? h("button", { class: "ghost", text: t("ui.undo"), onclick: () => undo(p.decision_id) }) : null),
+      picker,
       p.notes.length ? h("div", { class: "small muted" }, "📝 ", p.notes.join(" · ")) : null,
       h("div", { class: "body" }, highlight(data.text, marks[p.id] || []),
         (data.images || []).map(img => h("img", { alt: img.alt || "", loading: "lazy",
@@ -561,6 +567,42 @@ function highlight(text, marks) {
     i = best.at + best.v.length;
   }
   return frag;
+}
+
+// „Mută…”: alegi secțiunea din listă (citită din OneNote, doar citire); mutarea se face la „De aplicat”.
+async function movePicker(p, holder) {
+  if (holder.childElementCount) { holder.replaceChildren(); return; }
+  holder.replaceChildren(h("p", { class: "small muted", text: t("ui.move.loading") }));
+  let r;
+  try {
+    if (!S.sections || S.sections.ds !== S.ds) S.sections = { ds: S.ds, ...(await api("/api/sections" + q({ ds: S.ds }))) };
+    r = S.sections;
+  } catch (e) { holder.replaceChildren(h("p", { class: "small", text: "⚠ " + e.message })); return; }
+  const all = r.sections.filter(x => !(x.notebook === p.notebook && x.section === p.section));
+  const filter = h("input", { type: "search", placeholder: t("ui.move.filter") });
+  const list = h("select", { size: 8, class: "grow" });
+  const reason = h("input", { type: "text", placeholder: t("ui.move.reason") });
+  const ok = h("button", { class: "primary", text: t("ui.move.ok"), disabled: true });
+  function fill() {
+    const words = filter.value.toLowerCase().split(/\s+/).filter(Boolean);
+    const shown = all.filter(x => words.every(w => (x.notebook + " " + x.section).toLowerCase().includes(w)));
+    list.replaceChildren(...shown.map(x => h("option", { value: x.notebook + "\t" + x.section,
+      text: `${x.notebook} › ${x.section.split("/").join(" › ")}` })));
+    if (!shown.length) list.append(h("option", { disabled: true, text: t("ui.move.none") }));
+    ok.disabled = !list.value;
+  }
+  filter.oninput = fill;
+  list.onchange = () => { ok.disabled = !list.value; };
+  list.ondblclick = () => ok.click();
+  ok.onclick = () => { if (list.value) decide(p.id, "move", { target: list.value, note: reason.value.trim() }); };
+  fill();
+  holder.replaceChildren(h("div", { class: "stack movebox" },
+    h("strong", { text: t("ui.move.title") }),
+    r.live ? null : h("p", { class: "small muted", text: t("ui.move.offline") }),
+    filter, list, reason,
+    h("div", { class: "row" }, ok, h("button", { class: "ghost", text: t("ui.move.cancel"),
+      onclick: () => holder.replaceChildren() }))));
+  filter.focus();
 }
 
 function setFocus(i) {
@@ -633,7 +675,7 @@ async function viewApply() {
   const rows = plan.items.map(it => {
     const cb = h("input", { type: "checkbox", checked: it.status === "ready", disabled: it.status !== "ready" });
     checks[it.decision_id] = cb;
-    const what = it.action === "archive" ? t("ui.apply.move", { from: it.section, to: it.target })
+    const what = it.action === "archive" || it.action === "move" ? t("ui.apply.move", { from: it.section, to: it.target })
                                          : t("ui.apply.rename", { title: it.target });
     return h("tr", {}, h("td", {}, cb), h("td", { text: it.title }), h("td", { text: `${it.notebook} › ${it.section}` }),
       h("td", { text: t("ui.action." + it.action) }), h("td", { text: what }),

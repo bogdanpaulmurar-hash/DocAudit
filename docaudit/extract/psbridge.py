@@ -54,11 +54,11 @@ class BridgeUnavailable(RuntimeError):
     """PowerShell lipsește sau nu poate porni OneNote: calea nu se poate folosi (OneNote nu a căzut)."""
 
 
-def parse_reply(line: str) -> str:
-    """Un rând de la PowerShell → XML-ul paginii, sau eroarea potrivită."""
+def parse_reply(line: str, method: str = "GetPageContent") -> str:
+    """Un rând de la PowerShell → rezultatul (XML sau id), sau eroarea potrivită."""
     line = line.strip()
-    if line.startswith("OK "):
-        return base64.b64decode(line[3:]).decode("utf-8")
+    if line.startswith("OK"):
+        return base64.b64decode(line[3:]).decode("utf-8") if len(line) > 3 else ""
     if line.startswith("ERR "):
         head, _, message = line[4:].partition(" ")
         try:
@@ -66,18 +66,24 @@ def parse_reply(line: str) -> str:
         except ValueError:
             code = 0
         if code in RPC_GONE or code in RPC_BUSY:
-            raise OneNoteGone("GetPageContent", code, code in RPC_BUSY)
-        raise RuntimeError(f"GetPageContent (PowerShell): {hex(code & 0xFFFFFFFF)} {message[:300]}")
+            raise OneNoteGone(method, code, code in RPC_BUSY)
+        raise RuntimeError(f"{method} (PowerShell): {hex(code & 0xFFFFFFFF)} {message[:300]}")
     # procesul s-a oprit fără răspuns: OneNote (sau PowerShell) a căzut în timpul cererii
-    raise OneNoteGone("GetPageContent", -2147023170, False)
+    raise OneNoteGone(method, -2147023170, False)
 
 
-class PowerShellReader:
-    def __init__(self, exe: str | None = None) -> None:
+def b64(text: str) -> str:
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
+
+
+class PowerShellProcess:
+    """Un proces PowerShell care rulează `script`: un rând de cerere pe stdin, un rând de răspuns pe stdout."""
+
+    def __init__(self, script: str, exe: str | None = None) -> None:
         exe = exe or shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
         if not exe:
             raise BridgeUnavailable("PowerShell nu a fost găsit")
-        encoded = base64.b64encode(SCRIPT.encode("utf-16-le")).decode("ascii")
+        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
         try:
             self.proc = subprocess.Popen(
@@ -94,14 +100,14 @@ class PowerShellReader:
         assert self.proc.stdout is not None
         return self.proc.stdout.readline().decode("utf-8", "replace")
 
-    def page(self, page_id: str, info: int) -> str:
+    def request(self, line: str, method: str) -> str:
         assert self.proc.stdin is not None
         try:
-            self.proc.stdin.write(f"{page_id}\t{int(info)}\n".encode("utf-8"))
+            self.proc.stdin.write((line + "\n").encode("utf-8"))
             self.proc.stdin.flush()
         except OSError as e:
-            raise OneNoteGone("GetPageContent", -2147023170, False) from e
-        return parse_reply(self._readline())
+            raise OneNoteGone(method, -2147023170, False) from e
+        return parse_reply(self._readline(), method)
 
     def close(self) -> None:
         try:
@@ -110,3 +116,11 @@ class PowerShellReader:
             self.proc.wait(5)
         except Exception:
             self.proc.kill()
+
+
+class PowerShellReader(PowerShellProcess):
+    def __init__(self, exe: str | None = None) -> None:
+        super().__init__(SCRIPT, exe)
+
+    def page(self, page_id: str, info: int) -> str:
+        return self.request(f"{page_id}\t{int(info)}", "GetPageContent")
