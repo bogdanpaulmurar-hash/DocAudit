@@ -1,5 +1,9 @@
 # CHANGELOG — DocAudit
 
+## 0.1.10 — 2026-10-28
+- `Install.bat` instalează acum tot, inclusiv asemănarea după sens (modelul se descarcă doar prima dată). După fiecare `git pull` ajunge `Install.bat`, fără alt cuvânt. `Install.bat semantic` merge în continuare (face același lucru); `Install.bat baza` instalează fără model.
+- Livrare: `git pull`, apoi `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.9 — 2026-10-28
 - Nou: ecranul **„Export pentru bot”**, care înlocuiește scriptul vechi „1. Updating Script” (refăcut pe datele DocAudit, fără cod sau text copiat din el):
   - alegerea paginilor: fără duplicate identice (același text, aceleași imagini; rămâne referința, altfel pagina cea mai nouă), pagini goale, pagini învechite (din „Analiză”) și pagini arhivate / marcate învechite; paginile fără titlu („Untitled page”, „Fără titlu”, „Unbenannte Seite”) intră dacă au conținut, dar sunt semnalate și nu se compară ca duplicate. Fiecare pagină lăsată deoparte are motivul scris și poate fi inclusă totuși (sau scoasă) din ecran (`bot/overrides.json`);
