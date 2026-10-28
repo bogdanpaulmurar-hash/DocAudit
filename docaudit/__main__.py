@@ -20,6 +20,7 @@
     python -m docaudit report DIR [--format html|csv|md] [--out FILE]
     python -m docaudit apply DIR [--yes]          (previzualizare; --yes scrie în OneNote, dacă e permis)
     python -m docaudit restore DIR NUMĂR
+    python -m docaudit bot-export DIR [--out-dir DIR] [--full] [--plan]   (documentele pentru bot)
     python -m docaudit make-icon FOLDER
     python -m docaudit download-model              (o singură dată, singura comandă cu internet)
 """
@@ -53,6 +54,41 @@ def _selection(args: argparse.Namespace):
         return load_profile(data_dir() / "profiles", args.profile)
     return Selection(notebooks=args.notebook, sections=args.section, pages=args.page,
                      exclude_sections=args.exclude if args.exclude is not None else [DEFAULT_ARCHIVE])
+
+
+def _bot_export(args: argparse.Namespace) -> int:
+    from .bot.export import ExportAborted, default_out_dir, export
+    from .bot.select import build_plan
+    from .settings import load_settings
+
+    folder = resolve_folder(args.folder)
+    s = load_settings()
+    plan = build_plan(folder, s.bot_level, s.bot_skip_stale, s.bot_skip_duplicates)
+    c = plan.counts()
+    print(t("ui.bot.summary", pages=c["included"], docs=len(plan.documents)))
+    print(t("ui.bot.left", **c))
+    if args.plan:
+        for d in plan.documents:
+            print(f"  {d['name']}: {len(d['pages'])}")
+        return 0
+    out_dir = args.out_dir or (Path(s.bot_out_dir) if s.bot_out_dir else default_out_dir(folder))
+    try:
+        r = export(folder, plan, out_dir=out_dir, max_mb=s.bot_max_mb, full=args.full,
+                   progress=lambda n, total: print(f"\r{n}/{total}", end="", flush=True))
+    except ExportAborted as e:
+        print()
+        print(t("ui.error.onenote", error=str(e)))
+        return 2
+    print()
+    print(t("ui.bot.done", pages=len(r.pages), files=len(r.files), seconds=round(r.seconds)), out_dir)
+    print(t("ui.bot.reupload", count=len(r.reupload)))
+    for name in r.reupload:
+        print("  " + name)
+    if r.manual():
+        print(t("ui.bot.manual", count=len(r.manual())))
+        for m in r.manual():
+            print(f"  {m.title} ({m.doc}) {m.note}")
+    return 0
 
 
 def _tree_link(hierarchy, link: str) -> int:
@@ -207,7 +243,16 @@ def main(argv: list[str] | None = None) -> int:
     p_imp.add_argument("folder", type=Path)
     p_imp.add_argument("--out", type=Path, help=t("cli.extract.out"))
 
+    p_bot = sub.add_parser("bot-export", help=t("cli.bot.help"))
+    p_bot.add_argument("folder", type=Path)
+    p_bot.add_argument("--out-dir", type=Path, help=t("cli.bot.outdir"))
+    p_bot.add_argument("--full", action="store_true", help=t("ui.bot.full"))
+    p_bot.add_argument("--plan", action="store_true", help=t("cli.bot.plan"))
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "bot-export":
+        return _bot_export(args)
 
     if args.cmd == "sample":
         n = write_sample(args.out, args.seed)

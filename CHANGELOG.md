@@ -1,5 +1,17 @@
 # CHANGELOG — DocAudit
 
+## 0.1.9 — 2026-10-28
+- Nou: ecranul **„Export pentru bot”**, care înlocuiește scriptul vechi „1. Updating Script” (refăcut pe datele DocAudit, fără cod sau text copiat din el):
+  - alegerea paginilor: fără duplicate identice (același text, aceleași imagini; rămâne referința, altfel pagina cea mai nouă), pagini goale, pagini învechite (din „Analiză”) și pagini arhivate / marcate învechite; paginile fără titlu („Untitled page”, „Fără titlu”, „Unbenannte Seite”) intră dacă au conținut, dar sunt semnalate și nu se compară ca duplicate. Fiecare pagină lăsată deoparte are motivul scris și poate fi inclusă totuși (sau scoasă) din ecran (`bot/overrides.json`);
+  - un document pe notebook, pe folderul de sus sau pe secțiune; o mutare decisă („Mută…”) contează deja;
+  - PDF pe pagină prin OneNote `Publish` (doar fișiere pe disc, OneNote nu se schimbă), prin PowerShell ca citirea, cu trepte de rezervă: PDF → Word → pagină web (.mht) → text extras. Paginile din secțiuni cu parolă și cele exportate doar din text apar în „De verificat de mână”. Căile lungi trec printr-un folder temporar cu nume scurt;
+  - documente unite cu `pypdf` (dependință nouă, se instalează singură), cu un semn de carte pe pagină, împărțite în `_Part1`, `_Part2`… sub limita botului (implicit 95 MB) fără să rupă o pagină;
+  - lista „De reîncărcat în bot”: doar documentele în care s-a schimbat ceva de data trecută; documentele dispărute sunt numite ca să le scoți din bot. PDF-urile paginilor neschimbate se refolosesc.
+  - Exportul rulează în procesul separat al extragerii (oprire, blocare după 3 minute). Dacă OneNote cade, pornește un proces nou și reîncearcă pagina; după 3 pagini la rând cu OneNote căzut, exportul se oprește.
+  - Linia de comandă: `python -m docaudit bot-export DIR [--out-dir DIR] [--full] [--plan]`.
+- Teste: 161 trecute (`pytest -q`, Linux), inclusiv treptele de rezervă, parola, Word lipsă, OneNote căzut o dată / de mai multe ori, împărțirea sub limită cu semnele de carte, lista de reîncărcat și fișierele utilizatorului lăsate neatinse.
+- Livrare: `git pull`, apoi din nou `Install.bat` (instalează `pypdf`); închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.8 — 2026-10-28
 - Nou: decizia **„Mută…”** în „Grupuri”, pentru o pagină pusă în secțiunea greșită. Se deschide lista secțiunilor din OneNote (citită doar pentru afișare), cu căutare; alegi secțiunea și, opțional, motivul. Mutarea se face doar la „De aplicat”, ca la arhivare: copie de siguranță, pagina nouă în secțiunea aleasă cu nota „Mutat din: …”, originalul în Coșul OneNote, și se poate restaura din „Arhivă și jurnal”. Jurnalele de decizii vechi primesc automat coloana nouă (`target`).
 - Reparat înainte să apară: „De aplicat” scria în OneNote prin pywin32, calea care pe laptopul de lucru făcea OneNote să cadă. Acum scrie prin PowerShell (`apply/pswriter.py`), ca citirea; pywin32 rămâne rezerva dacă PowerShell lipsește.

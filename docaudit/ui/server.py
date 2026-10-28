@@ -220,6 +220,56 @@ def api_log(q: dict) -> dict:
     return {**log.info(), "lines": log.tail(300)}
 
 
+def _supervise(job: Job, spec: dict, cancelled_result) -> dict:
+    """Pornește procesul copil (`extract-worker`) și îl urmărește: progres, „Oprește”, blocare."""
+    import time
+
+    from ..extract import worker
+
+    proc, spec_path = worker.spawn(spec, job.id)
+    status_path = spec_path.with_suffix(".status.json")
+    cancel_path = spec_path.with_suffix(".cancel")
+    started = last_beat = time.time()
+    cancel_at = None
+    status: dict | None = None
+    try:
+        while True:
+            status = worker.read_status(status_path) or status
+            if status:
+                job.done, job.total = status.get("done", job.done), status.get("total", job.total)
+                job.child_log = status.get("log") or job.child_log
+                last_beat = max(last_beat, float(status.get("beat", 0)))
+            if proc.poll() is not None:
+                status = worker.read_status(status_path) or status
+                break
+            now = time.time()
+            if job.cancel.is_set() and cancel_at is None:
+                cancel_path.touch()
+                cancel_at = now
+            if cancel_at is not None and now - cancel_at > worker.CANCEL_GRACE:
+                _lg.warning("%s nu s-a oprit în %ss: procesul e oprit forțat", job.kind, worker.CANCEL_GRACE)
+                worker.kill_tree(proc)
+                status = {"state": "done", "result": cancelled_result(job.done, round(now - started))}
+                break
+            if now - last_beat > worker.STALL_SECONDS:
+                _lg.error("%s nu mai avansează de %ss (pagina %s din %s): procesul e oprit",
+                          job.kind, worker.STALL_SECONDS, max(job.done, 1), job.total)
+                worker.kill_tree(proc)
+                raise ApiError(504, "ui.error.extract.stalled", page=max(job.done, 1), total=job.total,
+                               seconds=worker.STALL_SECONDS)
+            time.sleep(0.3)
+    finally:
+        worker.kill_tree(proc)
+        worker.cleanup(spec_path)
+    if not status or status.get("state") == "running":
+        raise ApiError(502, "ui.error.extract.crashed", page=max(job.done, 1), total=job.total,
+                       code=proc.returncode)
+    if status["state"] == "error":
+        code = 503 if status["error"] == "ui.error.onenote" else 502
+        raise ApiError(code, status["error"], **status.get("params", {}))
+    return status["result"]
+
+
 def api_extract(body: dict) -> dict:
     """Pornește extragerea în fundal; progresul se citește din /api/job."""
     from ..extract.selection import Selection, save_profile
@@ -236,59 +286,13 @@ def api_extract(body: dict) -> dict:
     def work(job: Job) -> dict:
         # Într-un proces separat: dacă OneNote se blochează într-un apel COM, procesul se
         # poate opri, iar interfața rămâne liberă (înainte rămânea „rulează deja o extragere”).
-        import time
-
-        from ..extract import worker
-
         spec = {"name": name, "demo": bool(body.get("demo")), "full": bool(body.get("full")),
                 "selection": sel.to_dict(), "out": str(data_dir() / name)}
         if body.get("hang_after") is not None:  # doar testele: OneNote „înghețat”
             spec["hang_after"] = int(body["hang_after"])
-        proc, spec_path = worker.spawn(spec, job.id)
-        status_path = spec_path.with_suffix(".status.json")
-        cancel_path = spec_path.with_suffix(".cancel")
-        started = last_beat = time.time()
-        cancel_at = None
-        status: dict | None = None
-        try:
-            while True:
-                status = worker.read_status(status_path) or status
-                if status:
-                    job.done, job.total = status.get("done", job.done), status.get("total", job.total)
-                    job.child_log = status.get("log") or job.child_log
-                    last_beat = max(last_beat, float(status.get("beat", 0)))
-                if proc.poll() is not None:
-                    status = worker.read_status(status_path) or status
-                    break
-                now = time.time()
-                if job.cancel.is_set() and cancel_at is None:
-                    cancel_path.touch()
-                    cancel_at = now
-                if cancel_at is not None and now - cancel_at > worker.CANCEL_GRACE:
-                    _lg.warning("Extragerea nu s-a oprit în %ss: procesul e oprit forțat", worker.CANCEL_GRACE)
-                    worker.kill_tree(proc)
-                    status = {"state": "done", "result": {"name": name, "cancelled": True, "total": job.done,
-                                                          "fetched": 0, "reused": 0, "skipped": 0, "removed": 0,
-                                                          "errors": [], "error_count": 0,
-                                                          "seconds": round(now - started)}}
-                    break
-                if now - last_beat > worker.STALL_SECONDS:
-                    _lg.error("Extragerea nu mai avansează de %ss (pagina %s din %s): procesul e oprit",
-                              worker.STALL_SECONDS, max(job.done, 1), job.total)
-                    worker.kill_tree(proc)
-                    raise ApiError(504, "ui.error.extract.stalled", page=max(job.done, 1), total=job.total,
-                                   seconds=worker.STALL_SECONDS)
-                time.sleep(0.3)
-        finally:
-            worker.kill_tree(proc)
-            worker.cleanup(spec_path)
-        if not status or status.get("state") == "running":
-            raise ApiError(502, "ui.error.extract.crashed", page=max(job.done, 1), total=job.total,
-                           code=proc.returncode)
-        if status["state"] == "error":
-            code = 503 if status["error"] == "ui.error.onenote" else 502
-            raise ApiError(code, status["error"], **status.get("params", {}))
-        return status["result"]
+        return _supervise(job, spec, lambda done, seconds: {
+            "name": name, "cancelled": True, "total": done, "fetched": 0, "reused": 0, "skipped": 0, "removed": 0,
+            "errors": [], "error_count": 0, "seconds": seconds})
 
     job = _start_job("extract", work)
     if body.get("wait"):  # linia de comandă și testele: așteaptă rezultatul
@@ -379,6 +383,79 @@ def api_sections(q: dict) -> dict:
         items = [{"notebook": nb, "section": sec} for nb, sec in sorted(seen)]
         live = False
     return {"sections": items, "live": live}
+
+
+def _bot_options(body: dict) -> dict:
+    s = load_settings()
+    return {"level": body.get("level", s.bot_level), "skip_stale": bool(body.get("skip_stale", s.bot_skip_stale)),
+            "skip_duplicates": bool(body.get("skip_duplicates", s.bot_skip_duplicates))}
+
+
+def api_bot_plan(q: dict) -> dict:
+    """Ce pagini intră în documentele pentru bot (și de ce lipsesc celelalte)."""
+    from ..bot.export import default_out_dir, is_offline, last_run
+    from ..bot.select import build_plan
+
+    folder = _dataset(q.get("ds"))
+    s = load_settings()
+    opts = _bot_options({k: (v == "1") if k.startswith("skip_") else v for k, v in q.items()})
+    try:
+        plan = build_plan(folder, **opts)
+    except ValueError:
+        raise ApiError(400, "ui.error.settings", error="level")
+    return {**plan.to_dict(), "options": opts, "max_mb": s.bot_max_mb,
+            "out_dir": s.bot_out_dir or str(default_out_dir(folder)), "custom_out_dir": bool(s.bot_out_dir),
+            "offline": is_offline(folder), "compared": (folder / "findings.json").is_file(),
+            "last": last_run(folder)}
+
+
+def api_bot_override(body: dict) -> dict:
+    from ..bot.select import set_override
+
+    folder = _dataset(body.get("ds"))
+    value = body.get("value")
+    try:
+        set_override(folder, str(body.get("page") or ""), value if value in ("include", "exclude") else None)
+    except ValueError:
+        raise ApiError(400, "ui.error.action")
+    return {"ok": True}
+
+
+def api_bot_export(body: dict) -> dict:
+    """Pornește exportul pentru bot în procesul separat; progresul se citește din /api/job."""
+    folder = _dataset(body.get("ds"))
+    s = load_settings()
+    spec = {"kind": "bot", "name": folder.name, "folder": str(folder), "out_dir": s.bot_out_dir,
+            "max_mb": s.bot_max_mb, "full": bool(body.get("full")), **_bot_options(body)}
+
+    def work(job: Job) -> dict:
+        return _supervise(job, spec, lambda done, seconds: {"cancelled": True, "pages": [], "files": [],
+                                                             "reupload": [], "manual": [], "counts": {},
+                                                             "seconds": seconds, "out_dir": spec["out_dir"]})
+
+    job = _start_job("bot", work)
+    if body.get("wait"):  # testele: așteaptă rezultatul
+        while job.state == "running":
+            threading.Event().wait(0.05)
+        if job.error:
+            raise ApiError(503, job.error["error"], **job.error["params"])
+        return job.result or {}
+    return {"job": job.id}
+
+
+def api_bot_open(body: dict) -> dict:
+    """Deschide folderul cu documentele pentru bot în Explorer (doar pe Windows)."""
+    from ..bot.export import default_out_dir
+
+    folder = _dataset(body.get("ds"))
+    target = Path(load_settings().bot_out_dir or default_out_dir(folder))
+    target.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":  # pragma: no cover - Windows
+        import os
+
+        os.startfile(str(target))  # noqa: S606 - folderul local ales de utilizator
+        return {"opened": True, "path": str(target)}
+    return {"opened": False, "path": str(target)}
 
 
 def api_undo(body: dict) -> dict:
@@ -486,13 +563,14 @@ def api_settings(body: dict) -> dict:
 
 GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_state, "/api/page": api_page,
               "/api/tree": api_tree, "/api/sections": api_sections, "/api/scan": api_scan, "/api/plan": api_plan,
-              "/api/applied": api_applied,
+              "/api/applied": api_applied, "/api/bot/plan": api_bot_plan,
               "/api/diagnose": api_diagnose, "/api/job": api_job, "/api/log": api_log}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,
                "/api/settings": api_settings, "/api/link": api_link,
                "/api/dataset/delete": api_delete_dataset, "/api/settings/reset": api_reset_settings,
-               "/api/job/cancel": api_job_cancel}
+               "/api/job/cancel": api_job_cancel, "/api/bot/override": api_bot_override,
+               "/api/bot/export": api_bot_export, "/api/bot/open": api_bot_open}
 WRITE_ROUTES = {"/api/analyze", "/api/apply", "/api/restore", "/api/dataset/delete"}
 
 

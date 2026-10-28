@@ -75,7 +75,7 @@ function fmtDate(iso) {
 }
 
 // ---------- pornire ----------
-const TABS = ["source", "analysis", "groups", "apply", "journal", "settings"];
+const TABS = ["source", "analysis", "groups", "apply", "bot", "journal", "settings"];
 
 async function boot() {
   S.info = await api("/api/info");
@@ -133,7 +133,7 @@ async function openTab(tab) {
   view.replaceChildren(h("div", { class: "empty", text: t("ui.loading") }));
   await guard(async () => {
     const render = { source: viewSource, analysis: viewAnalysis, groups: viewGroups, apply: viewApply,
-                     journal: viewJournal, settings: viewSettings }[tab];
+                     bot: viewBot, journal: viewJournal, settings: viewSettings }[tab];
     view.replaceChildren(guide(tab), await render());
   });
 }
@@ -703,6 +703,165 @@ async function viewApply() {
     h("div", { class: "row" }, button, !plan.write_enabled
       ? h("button", { onclick: () => openTab("settings"), text: t("ui.tab.settings") }) : null), out);
   return wrap;
+}
+
+// ---------- Export pentru bot ----------
+// Paginile curățate → PDF-uri unite pe documente, sub limita botului; lista de reîncărcat.
+async function viewBot() {
+  if (!S.ds) return needData();
+  const st = S.info.settings;
+  const level = h("select", {}, ["notebook", "top", "section"].map(v =>
+    h("option", { value: v, selected: st.bot_level === v, text: t("ui.bot.level." + v) })));
+  const skipStale = h("input", { type: "checkbox", checked: st.bot_skip_stale });
+  const skipDup = h("input", { type: "checkbox", checked: st.bot_skip_duplicates });
+  const maxMb = h("input", { type: "number", min: "1", max: "2000", step: "1", value: st.bot_max_mb, size: 6 });
+  const outDir = h("input", { type: "text", value: st.bot_out_dir || "", size: 48, placeholder: t("ui.bot.out.auto") });
+  const full = h("input", { type: "checkbox" });
+  const summary = h("div", { class: "stack" });
+  const docsBox = h("div", { class: "stack" });
+  const runBox = h("div", { class: "stack" });
+  let plan = null;
+
+  async function saveOptions() {
+    await guard(async () => {
+      S.info.settings = await api("/api/settings", {
+        bot_level: level.value, bot_skip_stale: skipStale.checked, bot_skip_duplicates: skipDup.checked,
+        bot_max_mb: Number(maxMb.value), bot_out_dir: outDir.value.trim() });
+      await refresh();
+    });
+  }
+  [level, skipStale, skipDup, maxMb, outDir].forEach(el => { el.onchange = saveOptions; });
+
+  async function override(page, value) {
+    await guard(async () => { await api("/api/bot/override", { ds: S.ds, page, value }); await refresh(); });
+  }
+
+  function pageRow(p) {
+    const cb = h("input", { type: "checkbox", checked: p.included, onchange: () => override(p.id, cb.checked ? "include" : "exclude") });
+    const bits = [h("label", {}, cb, " ", p.title || t("ui.bot.notitle"))];
+    if (p.untitled && p.included) bits.push(h("span", { class: "badge sev-medium", text: t("ui.bot.untitled") }));
+    if (!p.included) bits.push(h("span", { class: "badge", text: t("ui.bot.reason." + (p.reason || "excluded")) }));
+    if (p.duplicate_of) {
+      const other = plan.pages.find(x => x.id === p.duplicate_of);
+      bits.push(h("span", { class: "small muted", text: t("ui.bot.dupof", { title: other ? other.title : p.duplicate_of }) }));
+    }
+    if (p.override) bits.push(h("button", { class: "ghost small", title: t("ui.bot.auto.help"), text: t("ui.bot.auto"),
+                                            onclick: () => override(p.id, null) }));
+    bits.push(h("span", { class: "small muted", text: " · " + p.section }));
+    return h("li", { class: "row" }, ...bits);
+  }
+
+  async function refresh() {
+    plan = await api("/api/bot/plan" + q({ ds: S.ds }));
+    const c = plan.counts;
+    summary.replaceChildren(...[
+      h("p", {}, h("strong", { text: t("ui.bot.summary", { pages: c.included, docs: plan.documents.length }) })),
+      h("p", { class: "small", text: t("ui.bot.left", c) }),
+      c.untitled ? h("p", { class: "small notice", text: t("ui.bot.untitled.help", { count: c.untitled }) }) : null,
+      !plan.compared && skipStale.checked ? h("p", { class: "small notice", text: t("ui.bot.nocompare") }) : null,
+      plan.offline ? h("p", { class: "small notice", text: t("ui.bot.offline") }) : null,
+      h("p", { class: "small muted", text: t("ui.bot.where", { path: plan.out_dir }) })].filter(Boolean));
+    const byDoc = {};
+    plan.pages.forEach(p => { if (p.included) (byDoc[p.doc] = byDoc[p.doc] || []).push(p); });
+    const left = plan.pages.filter(p => !p.included);
+    docsBox.replaceChildren(...[
+      h("h2", { text: t("ui.bot.docs") }),
+      ...plan.documents.map(d => h("details", { class: "botdoc" },
+        h("summary", {}, h("strong", { text: d.name }), " ", h("span", { class: "muted", text: t("ui.pages", { count: d.pages.length }) })),
+        h("ul", { class: "plain" }, (byDoc[d.name] || []).map(pageRow)))),
+      left.length ? h("details", { class: "botdoc" },
+        h("summary", {}, h("strong", { text: t("ui.bot.leftout", { count: left.length }) })),
+        h("ul", { class: "plain" }, left.map(pageRow))) : null].filter(Boolean));
+    if (plan.last && !runBox.dataset.live) renderResult(plan.last, true);
+  }
+
+  function renderResult(r, old) {
+    const parts = [];
+    if (old) parts.push(h("p", { class: "small muted", text: t("ui.bot.last", { when: fmtDate(r.finished_at) }) }));
+    if (r.cancelled) {
+      parts.push(h("p", { class: "notice", text: t("ui.bot.cancelled") }));
+      runBox.replaceChildren(...parts);
+      return;
+    }
+    parts.push(h("p", {}, h("strong", { text: t("ui.bot.done", { pages: (r.pages || []).length, files: (r.files || []).length,
+                                                                  seconds: Math.round(r.seconds || 0) }) })),
+      h("div", { class: "row" }, h("span", { class: "small muted", text: r.out_dir }),
+        h("button", { onclick: () => guard(async () => {
+          const o = await api("/api/bot/open", { ds: S.ds });
+          if (!o.opened) toast(o.path);
+        }), text: t("ui.bot.open") })));
+    const counts = Object.entries(r.counts || {}).map(([k, v]) => t("ui.bot.method." + k) + ": " + v).join(" · ");
+    if (counts) parts.push(h("p", { class: "small", text: counts }));
+    parts.push(h("h2", { text: t("ui.bot.reupload", { count: (r.reupload || []).length }) }),
+      (r.reupload || []).length ? h("ul", {}, r.reupload.map(n => h("li", { text: n })))
+        : h("p", { class: "muted", text: t("ui.bot.reupload.none") }));
+    if ((r.removed_docs || []).length) parts.push(h("p", { class: "notice", text: t("ui.bot.removed", { names: r.removed_docs.join(", ") }) }));
+    const big = (r.files || []).filter(f => f.oversize);
+    if (big.length) parts.push(h("p", { class: "notice err", text: t("ui.bot.oversize", { names: big.map(f => f.name).join(", ") }) }));
+    if ((r.manual || []).length) parts.push(h("details", { open: true },
+      h("summary", {}, h("strong", { text: t("ui.bot.manual", { count: r.manual.length }) })),
+      h("p", { class: "small muted", text: t("ui.bot.manual.help") }),
+      h("ul", {}, r.manual.map(m => h("li", {}, m.title, " ", h("span", { class: "small muted",
+        text: `· ${m.doc} · ${t("ui.bot.method." + m.method)}${m.note ? " · " + (S.texts["ui.bot.note." + m.note] ? t("ui.bot.note." + m.note) : m.note) : ""}` }))))));
+    if ((r.files || []).length) parts.push(h("details", {},
+      h("summary", { text: t("ui.bot.files", { count: r.files.length }) }),
+      h("table", {}, h("tr", {}, ["ui.col.name", "ui.col.pages", "ui.bot.size"].map(k => h("th", { text: t(k) }))),
+        r.files.map(f => h("tr", {}, h("td", { text: f.name }), h("td", { text: f.pages }),
+                                 h("td", { text: (f.size / 1048576).toFixed(1) + " MB" }))))));
+    runBox.replaceChildren(...parts);
+  }
+
+  async function run() {
+    let started;
+    try { started = await api("/api/bot/export", { ds: S.ds, full: full.checked }); } catch (e) {
+      runBox.replaceChildren(h("p", { class: "notice err", text: e.message }));
+      return;
+    }
+    runBox.dataset.live = "1";
+    const bar = h("progress", { max: "1", value: "0" });
+    const count = h("span", { class: "muted", text: t("ui.source.running") });
+    const stop = h("button", { text: t("ui.source.stop"), onclick: async () => {
+      stop.disabled = true;
+      await guard(() => api("/api/job/cancel", { id: started.job }));
+    } });
+    const lines = h("pre", { class: "log small" });
+    runBox.replaceChildren(h("div", { class: "row" }, bar, count, stop), lines);
+    let job;
+    for (;;) {
+      await new Promise(r => setTimeout(r, 800));
+      try { job = await api("/api/job" + q({ id: started.job })); } catch (e) { continue; }
+      if (job.total) {
+        bar.max = String(job.total); bar.value = String(job.done);
+        count.textContent = t("ui.source.progress", { done: job.done, total: job.total });
+      }
+      lines.textContent = (job.log || []).join("\n");
+      if (job.state !== "running") break;
+    }
+    if (job.state === "error") {
+      runBox.replaceChildren(h("div", { class: "notice err" }, h("p", { text: t(job.error.error, job.error.params) }),
+        h("p", { class: "small", text: t("ui.source.seelog") }), h("pre", { class: "log small", text: (job.log || []).join("\n") })));
+      return;
+    }
+    renderResult(job.result, false);
+    toast(t("ui.bot.done", { pages: (job.result.pages || []).length, files: (job.result.files || []).length,
+                             seconds: Math.round(job.result.seconds || 0) }));
+  }
+
+  await refresh();
+  return h("div", { class: "stack" },
+    h("div", { class: "card stack" }, h("h1", { text: t("ui.bot.title") }), h("p", { class: "muted", text: t("ui.bot.help") }),
+      h("div", { class: "row" },
+        h("label", {}, t("ui.bot.level"), " ", level),
+        h("label", {}, skipStale, " ", t("ui.bot.skip_stale")),
+        h("label", {}, skipDup, " ", t("ui.bot.skip_duplicates")),
+        h("label", {}, t("ui.bot.max_mb"), " ", maxMb)),
+      h("div", { class: "row" }, h("label", {}, t("ui.bot.out"), " ", outDir)),
+      h("p", { class: "small muted", text: t("ui.bot.out.help") }),
+      summary,
+      h("div", { class: "row" }, h("button", { class: "primary", onclick: run, text: t("ui.bot.run") }),
+        h("label", {}, full, " ", t("ui.bot.full"))),
+      runBox),
+    h("div", { class: "card" }, docsBox));
 }
 
 // ---------- 5. Jurnal și arhivă ----------

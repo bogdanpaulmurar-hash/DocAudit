@@ -23,6 +23,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Pornire obișnuită: `pythonw -m docaudit` (fără comandă: tray + browser) sau `python -m docaudit ui [--port N] [--no-browser]`
 - Raport: `python -m docaudit report DIR [--format html|csv|md]`
 - Aplicare în OneNote: `python -m docaudit apply DIR` (previzualizare) · `--yes` (scrie, doar cu scrierea pornită în setări) · `restore DIR NUMĂR`
+- Export pentru bot: `python -m docaudit bot-export DIR [--out-dir DIR] [--full] [--plan]` (setările `bot_*` din `settings.json`)
 - Iconiță: `python -m docaudit make-icon FOLDER` (o folosește `Install.bat` pentru scurtături)
 - Log: în UI Setări → Log tehnic; fișierele `%LOCALAPPDATA%\DocAudit\data\logs\docaudit.log` și `<clona>\logs\pc-xxxxxx.log` (`DOCAUDIT_LOG_SHARE=0` oprește copia; testele o opresc)
 
@@ -65,6 +66,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/decisions.py` — jurnalul deciziilor (SQLite `DIR/decisions.db`): cine, când, ce, de ce; anulare; ce s-a aplicat
 - `docaudit/report.py` — `build_state()` (ce arată UI-ul) și raportul HTML / CSV / Markdown
 - `docaudit/apply/` — `xmlops.py` (copie XML cu notă „Mutat din”, titlu cu prefix), `writer.py` (`ComOneNote` = scrierile prin pywin32; `FakeOneNote` pentru teste și demo), `pswriter.py` (aceleași scrieri prin PowerShell, folosite întâi), `run.py` (plan, apply, restore, copii de siguranță; arhivare, mutare, marcare)
+- `docaudit/bot/` — „Export pentru bot”: `select.py` (ce pagini intră și de ce nu: duplicate identice, goale, învechite, arhivate; alegerile din `bot/overrides.json`), `publish.py` (`PowerShellPublisher`: doar OneNote `Publish` și Word → PDF; `OfflinePublisher`), `pdf.py` (PDF din text, unire `pypdf` sub limită cu semne de carte), `export.py` (trepte PDF → Word → MHT → text, cache pe pagină, lista de reîncărcat); totul în `<extragere>/bot/`
 - `docaudit/ui/server.py` + `ui/static/` — server din biblioteca standard doar pe 127.0.0.1 (Host verificat, jeton pe /api/, CSP), pagină unică fără build JS
 - `docaudit/tray.py`, `docaudit/icon.py` — iconița din tray (pystray, opțional) și iconița desenată din cod (.png / .ico)
 - `devpilot.tool.json` — descrierea pentru DevPilot
@@ -79,7 +81,8 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Documentația analizată e amestecată în română, engleză și germană: orice listă de cuvinte (titluri, semne de învechire) se scrie pentru toate trei, iar eșantionul conține pagini în toate trei.
 - Datele extrase stau implicit în `%LOCALAPPDATA%\DocAudit\data` (`data_dir()`), niciodată în clona din Google Drive. Un nume simplu dat la `--out` sau ca folder ajunge tot acolo (`resolve_folder()`).
 - Eșantionul nu are voie să dea indicii despre răspuns în id-uri sau în `source.ref`; dacă schimbi generatorul, regenerează fixture-ul (`python -m docaudit sample`) în același commit.
-- Extragerea nu scrie în OneNote: `ReadOnlyOneNote` are doar cele două metode de citire (test automat). Singurul cod care scrie: `testnotebook.py` (doar notebook nou), `apply/writer.py` (`ComOneNote`) și `apply/pswriter.py` (`PowerShellWriter`), apelate doar din `apply/run.py`.
+- Extragerea nu scrie în OneNote: `ReadOnlyOneNote` are doar cele două metode de citire (test automat). Singurul cod care scrie: `testnotebook.py` (doar notebook nou), `apply/writer.py` (`ComOneNote`) și `apply/pswriter.py` (`PowerShellWriter`), apelate doar din `apply/run.py`. `bot/publish.py` folosește doar `Publish` (fișier pe disc, OneNote neschimbat) și Word (test automat pe script).
+- Documentele pentru bot: în `<extragere>/bot/out` sau în folderul ales (cale completă, niciodată în clona din Google Drive, verificat la salvarea setării). Din folderul ales se șterg doar fișierele scrise de un export DocAudit anterior.
 - Scrierea în OneNote: doar decizii confirmate din previzualizare, doar cu `write_enabled` pornit, copie XML în `_backups` înainte, pagina modificată după extragere se sare, originalul ajunge în Coș (nu `deletePermanently`).
 - Serverul UI: fără biblioteci externe, fără CORS, fără resurse de pe internet; tot textul paginilor intră în DOM prin `textContent`.
 - Gruparea nu modifică paginile extrase; scrie doar `groups.json`. Compararea scrie doar `findings.json`; constatările sunt sugestii, nu se aplică singure. Corecturile utilizatorului (`group_overrides.json`) au prioritate față de scoruri și se păstrează între rulări.
@@ -87,6 +90,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Formatul de intrare are câmp `schema_version`; orice schimbare a lui = versiune nouă + migrare + notă în CHANGELOG.
 
 ## Stare
+- v0.1.9 — ecranul „Export pentru bot” (preluat din „1. Updating Script”): pagini curățate → PDF prin `Publish` cu trepte de rezervă → documente sub 95 MB → lista de reîncărcat. Netestat pe Windows real.
 - v0.1.8 — decizia „Mută…” (secțiune aleasă din listă, aplicată ca arhivarea, restaurabilă); „Aplică” scrie prin PowerShell (`apply/pswriter.py`).
 - v0.1.7 — paginile se citesc pe prima cale care nu face OneNote să cadă (PowerShell → pywin32 → comtypes → dinamic), ținută minte în `data_dir()/onenote_read.json`.
 - v0.1.6 — extragerea din UI rulează în proces separat (`extract/worker.py`), oprit după 3 minute fără progres sau la „Oprește”; salvare la 20 de pagini.
