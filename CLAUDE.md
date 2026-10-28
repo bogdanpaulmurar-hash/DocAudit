@@ -8,7 +8,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Teste: `pytest -q` (CI: Ubuntu + Windows, Python 3.11 și 3.12)
 - Eșantion fictiv: `python -m docaudit sample` (regenerează `tests/fixtures/sample_v1/`)
 - Validare format: `python -m docaudit validate <folder>`
-- Arbore OneNote: `python -m docaudit tree` (`--demo` = eșantionul, fără OneNote)
+- Arbore OneNote: `python -m docaudit tree` (`--demo` = eșantionul, fără OneNote; `--link URL` = ce notebook corespunde link-ului din browser)
 - Extragere: `python -m docaudit extract [--profile NUME | --notebook X --section "NB/S" --page ID] [--out DIR] [--full] [--demo]`
 - Profiluri: `python -m docaudit profile save NUME --notebook X ...` · `python -m docaudit profile list` (în `data/profiles/`, sau `DOCAUDIT_DATA`)
 - Import exporturi manuale: `python -m docaudit import-files FOLDER [--out DIR]` (.mht, .docx)
@@ -42,6 +42,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/extract/run.py` — extragere cu selecție, incremental după data modificării, cache de imagini
 - `docaudit/extract/selection.py` — bife (notebook / secțiune / pagină), excluderi („Arhivă”), profiluri
 - `docaudit/extract/files.py` — import .mht / .docx (alternativa fără COM)
+- `docaudit/extract/links.py` — link-ul din browser (SharePoint / OneDrive / `onenote:`) → notebook-ul din OneNote desktop, după atributul `path`; doar text, fără rețea
 - `docaudit/extract/demo.py` — OneNote fals care servește eșantionul (teste, lucru fără Windows)
 - `docaudit/extract/check.py` — compară o extragere cu eșantionul
 - `docaudit/testnotebook.py` — singurul cod care scrie în OneNote până la Etapa 7, doar într-un notebook NOU
@@ -78,4 +79,4 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Formatul de intrare are câmp `schema_version`; orice schimbare a lui = versiune nouă + migrare + notă în CHANGELOG.
 
 ## Stare
-- v0.1.0 — toate etapele din plan (1–8) sunt pe `main`: extragere, grupare, comparare, interfață cu jurnal și raport, aplicare în OneNote cu previzualizare / copie / restaurare, tray cu iconiță. Pe eșantion: grupare F1 1.00, conflicte 20/20, învechite 10/10. **Netestat pe Windows real**: COM (citire și scriere), `Install.bat` cu scurtături, tray (pașii în `docs/INSTALARE.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).
+- v0.1.2 — toate etapele din plan (1–8) sunt pe `main`: extragere, grupare, comparare, interfață cu jurnal și raport, aplicare în OneNote cu previzualizare / copie / restaurare, tray cu iconiță. Pe eșantion: grupare F1 1.00, conflicte 20/20, învechite 10/10. **Netestat pe Windows real**: COM (citire și scriere), `Install.bat` cu scurtături, tray (pașii în `docs/INSTALARE.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).

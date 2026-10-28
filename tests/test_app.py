@@ -287,6 +287,13 @@ def test_server_extract_demo(server, tmp_path):
     r = _req(server, "POST", "/api/extract", {"demo": True, "out": "doar-retea", "sections": ["Proceduri IT/Rețea"]})[1]
     assert r["name"] == "doar-retea" and 0 < r["total"] < 80
     assert _req(server, "POST", "/api/extract", {"demo": True, "out": "../afara"})[0] == 400
+    assert tree["notebooks"][0]["location"].startswith("https://exemplu.sharepoint.com/")
+    link = "https://exemplu.sharepoint.com/sites/Echipa/Shared%20Documents/Proceduri%20IT/Re%C8%9Bea.one"
+    found = _req(server, "POST", "/api/link", {"demo": True, "link": link})[1]
+    assert found["found"] and found["notebook"] == "Proceduri IT" and found["section"] == "Proceduri IT/Rețea"
+    missing = _req(server, "POST", "/api/link", {"demo": True, "link": link.replace("Proceduri%20IT", "Altul")})[1]
+    assert not missing["found"] and missing["open_url"].startswith("onenote:https://exemplu.sharepoint.com/")
+    assert _req(server, "POST", "/api/link", {"demo": True, "link": "javascript:alert(1)"})[0] == 400
 
 
 # ---------- iconița ----------

@@ -65,7 +65,15 @@ Pașii ating doar un notebook nou, creat cu eșantionul fictiv. Notebook-urile r
 3. **Grupuri** → uită-te la conflicte. Nu porni scrierea pe notebook-ul real până nu a mers testul de la pasul 5.
    - Datele rămân local. Nu trimite conținutul: spune-mi doar câte pagini și grupuri au ieșit, ce prag pare bun, câte conflicte par reale și câte sunt alarme false.
 
-## 7. Limbă și curățenie
+## 7. Notebook de echipă (SharePoint / Teams) și „nu apare niciun notebook”
+DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în browser nu apare în listă.
+1. În **Sursă**, lipește în „Link din browser (notebook de echipă)” adresa notebook-ului din OneNote pe web (bara browserului) sau din OneNote desktop (clic dreapta pe notebook → Copiază linkul) → „Găsește notebook-ul”.
+   - Dacă e deschis în OneNote desktop, DocAudit îl bifează (sau secțiunea din link). Apasă „Extrage”.
+   - Dacă nu e, apasă „Deschide în OneNote desktop”, așteaptă sincronizarea, apoi din nou „Găsește notebook-ul”. Dacă butonul lipsește (link scurt de partajare), în OneNote pe web alege „Deschide în aplicația desktop”.
+2. Dacă „Arată notebook-urile” dă o eroare, ea rămâne acum în pagină. Din linia de comandă: `DocAudit.bat tree` (lista, cu adresa fiecărui notebook) și `DocAudit.bat tree --link "<link>"`. Trimite-mi mesajul de eroare, nu conținutul paginilor.
+3. Fără COM (de exemplu blocat de IT): exportă paginile din OneNote ca .docx sau .mht și folosește `DocAudit.bat import-files <folder>`.
+
+## 8. Limbă și curățenie
 - Limba se schimbă din interfață. În linia de comandă: `set DOCAUDIT_LANG=en` sau `set DOCAUDIT_LANG=de` înainte de comenzi.
 - Notebook-ul de test se închide din OneNote (clic dreapta → Închide acest notebook), iar folderul lui se poate șterge manual.
 - Dezinstalare: șterge folderul `%LOCALAPPDATA%\DocAudit` (dispar și datele extrase) și scurtăturile DocAudit.
