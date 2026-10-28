@@ -58,7 +58,7 @@ def remove_orphan_images(out: Path, pages: list[Page]) -> None:
                 f.unlink()
 
 
-CHECKPOINT_EVERY = 50  # la notebook-uri mari: ce s-a citit se salvează pe parcurs
+CHECKPOINT_EVERY = 20  # la notebook-uri mari: ce s-a citit se salvează pe parcurs
 ABORT_AFTER = 5  # primele pagini cerute pică toate → oprește, nu mai încerca alte sute
 
 

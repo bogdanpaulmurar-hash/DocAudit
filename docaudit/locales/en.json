@@ -318,5 +318,7 @@
   "ui.log.empty": "The log is empty.",
   "ui.log.refresh": "Refresh",
   "diag.pages": "Reading one page",
-  "diag.pages.fix": "OneNote returns the list but not the page content. Open the notebook in OneNote desktop and wait for it to sync (no red circle), then check again. If it still fails, send me the text above; it is also in the log."
+  "diag.pages.fix": "OneNote returns the list but not the page content. Open the notebook in OneNote desktop and wait for it to sync (no red circle), then check again. If it still fails, send me the text above; it is also in the log.",
+  "ui.error.extract.stalled": "OneNote did not respond for {seconds} seconds at page {page} of {total}, so DocAudit stopped the extraction. Pages read so far are kept. Check whether OneNote shows a dialog (for example “How do you want to start OneNote?”), choose Start Normally, wait for sync and start the extraction again: it continues where it stopped.",
+  "ui.error.extract.crashed": "The extraction process stopped unexpectedly at page {page} of {total} (code {code}). Pages read so far are kept. Details in Settings → Technical log."
 }

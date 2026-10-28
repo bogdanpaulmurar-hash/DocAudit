@@ -287,7 +287,7 @@ def test_server_extract_demo(server, tmp_path):
     assert len(tree["notebooks"]) == 3
     started = _req(server, "POST", "/api/extract", {"demo": True, "out": "doar-retea",
                                                    "sections": ["Proceduri IT/Rețea"]})[1]
-    for _ in range(200):  # extragerea rulează în fundal; progresul vine din /api/job
+    for _ in range(600):  # extragerea rulează într-un proces separat; progresul vine din /api/job
         job = _req(server, "GET", f"/api/job?id={started['job']}")[1]
         if job["state"] != "running":
             break
@@ -364,3 +364,40 @@ def test_exe_of_command_line():
         "C:\\Program Files\\Microsoft Office\\Root\\Office16\\ONENOTE.EXE"
     assert _exe_of("C:\\Office\\ONENOTE.EXE /automation") == "C:\\Office\\ONENOTE.EXE"
     assert _exe_of(None) is None
+
+
+def _wait_job(server, job_id, seconds=60):
+    for _ in range(int(seconds / 0.1)):
+        job = _req(server, "GET", f"/api/job?id={job_id}")[1]
+        if job["state"] != "running":
+            return job
+        time.sleep(0.1)
+    raise AssertionError("extragerea nu s-a terminat")
+
+
+def test_server_extract_stops_when_onenote_hangs(server, monkeypatch):
+    from docaudit.extract import worker
+
+    monkeypatch.setattr(worker, "STALL_SECONDS", 4)
+    code, body, _ = _req(server, "POST", "/api/extract", {"demo": True, "out": "blocat", "hang_after": 25,
+                                                         "wait": True})
+    assert code == 503 and body["error"] == "ui.error.extract.stalled"
+    assert "26" in json.dumps(body)  # pagina la care OneNote s-a blocat
+    again = _req(server, "POST", "/api/extract", {"demo": True, "out": "blocat", "wait": True})
+    assert again[0] == 200 and again[1]["reused"] == 20  # punctul de salvare de la pagina 20
+    assert not list(worker.jobs_dir().iterdir())  # fișierele procesului sunt șterse
+
+
+def test_server_extract_cancel_kills_hung_worker(server, monkeypatch):
+    from docaudit.extract import worker
+
+    monkeypatch.setattr(worker, "CANCEL_GRACE", 1)
+    started = _req(server, "POST", "/api/extract", {"demo": True, "out": "oprit", "hang_after": 5})[1]
+    for _ in range(300):
+        if _req(server, "GET", f"/api/job?id={started['job']}")[1]["done"] >= 5:
+            break
+        time.sleep(0.1)
+    assert _req(server, "POST", "/api/job/cancel", {"id": started["job"]})[0] == 200
+    job = _wait_job(server, started["job"])
+    assert job["state"] == "done" and job["result"]["cancelled"]
+    assert _req(server, "POST", "/api/extract", {"demo": True, "out": "oprit", "wait": True})[0] == 200

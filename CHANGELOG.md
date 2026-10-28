@@ -1,5 +1,11 @@
 # CHANGELOG — DocAudit
 
+## 0.1.6 — 2026-10-28
+- Reparat: când OneNote se bloca la o pagină (de exemplu cu fereastra „How do you want to start OneNote?” după o cădere), DocAudit rămânea „ocupat” („rulează o extragere…”), iar „Extrage” și „Oprește” nu mai făceau nimic până la închiderea aplicației. Acum extragerea din interfață rulează într-un **proces separat** (`extract/worker.py`), pe care DocAudit îl supraveghează: dacă nu avansează 3 minute la aceeași pagină, îl oprește și spune la ce pagină s-a blocat; „Oprește” îl închide după 20 de secunde dacă nu se oprește singur. Interfața rămâne liberă.
+- Ce s-a citit se salvează acum la fiecare 20 de pagini (înainte 50), deci după o oprire forțată se pierde puțin.
+- Teste: 136 trecute (`pytest -q`, Linux), inclusiv OneNote „înghețat” la pagina 26 (oprire după timp, reluare de la pagina 20) și „Oprește” pe un proces blocat.
+- Livrare: `git pull`, apoi din nou `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.5 — 2026-10-28
 - Reparat: pe laptopul de lucru (1449 de pagini) extragerea se oprea la primele pagini cu „The RPC server is unavailable” (0x800706BA): OneNote se închidea sau se bloca la cererea unei pagini, iar DocAudit continua cu același obiect COM mort. Acum, când OneNote nu mai răspunde, DocAudit nu mai încearcă alte variante de parametri, se reconectează (pornește OneNote din nou) și reîncearcă pagina; dacă OneNote cade din nou la aceeași pagină, o cere fără imagini și notează asta în log. Când OneNote e doar ocupat (sincronizare), așteaptă și reîncearcă. Între pagini e o pauză de 50 ms, ca în scriptul vechi.
 - Reparat: copia logului din Google Drive rămânea la pornire, pentru că Drive nu urcă un fișier ținut deschis. Acum fiecare rând se scrie și fișierul se închide imediat (local și în Drive).

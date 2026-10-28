@@ -47,6 +47,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/extract/selection.py` — bife (notebook / secțiune / pagină), excluderi („Arhivă”), profiluri
 - `docaudit/extract/files.py` — import .mht / .docx (alternativa fără COM)
 - `docaudit/extract/links.py` — link-ul din browser (SharePoint / OneDrive / `onenote:`) → notebook-ul din OneNote desktop, după atributul `path`; doar text, fără rețea
+- `docaudit/extract/worker.py` — extragerea din UI într-un proces copil (`extract-worker`, comandă ascunsă), stare prin fișiere în `data_dir()/_jobs`
 - `docaudit/extract/diagnose.py` — „Verifică legătura cu OneNote”: pașii pe rând, doar citire
 - `docaudit/extract/demo.py` — OneNote fals care servește eșantionul (teste, lucru fără Windows)
 - `docaudit/extract/check.py` — compară o extragere cu eșantionul
@@ -85,5 +86,6 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Formatul de intrare are câmp `schema_version`; orice schimbare a lui = versiune nouă + migrare + notă în CHANGELOG.
 
 ## Stare
+- v0.1.6 — extragerea din UI rulează în proces separat (`extract/worker.py`), oprit după 3 minute fără progres sau la „Oprește”; salvare la 20 de pagini.
 - v0.1.5 — extragere robustă: OneNote căzut la GetPageContent (RPC 0x800706BA) → reconectare, reîncercare, pagina fără imagini; v0.1.4 a adus `ComCaller`, extragerea în fundal și logul tehnic (copie în Drive, scris rând cu rând).
 - v0.1.3 — toate etapele din plan (1–8) sunt pe `main`: extragere, grupare, comparare, interfață cu jurnal și raport, aplicare în OneNote cu previzualizare / copie / restaurare, tray cu iconiță. Pe eșantion: grupare F1 1.00, conflicte 20/20, învechite 10/10. **Netestat pe Windows real**: COM (citire și scriere), `Install.bat` cu scurtături, tray (pașii în `docs/INSTALARE.md`). Riscurile deschise sunt în KNOWN_ISSUES.md și MODIFICARI_PROIECTE (Google Drive).
