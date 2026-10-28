@@ -27,6 +27,12 @@ class Settings:
     port: int = 8765
     share_log: bool = True  # copia logului tehnic (fără conținut) în folderul DocAudit din Google Drive
     log_dir: str = ""  # gol = folderul `logs` din clona DocAudit
+    # „Export pentru bot”
+    bot_level: str = "top"  # un document pe: notebook | top (folderul de sus) | section
+    bot_max_mb: float = 95.0  # limita botului e 100 MB pe fișier; 5 MB rezervă
+    bot_out_dir: str = ""  # gol = <extragere>/bot/out
+    bot_skip_stale: bool = True
+    bot_skip_duplicates: bool = True
 
     def validate(self) -> list[str]:
         errors = []
@@ -38,10 +44,29 @@ class Settings:
             errors.append("archive_section")
         if not 1024 <= self.port <= 65535:
             errors.append("port")
+        if self.bot_level not in ("notebook", "top", "section"):
+            errors.append("bot_level")
+        if not isinstance(self.bot_max_mb, (int, float)) or not 1 <= self.bot_max_mb <= 2000:
+            errors.append("bot_max_mb")
+        if self.bot_out_dir and not _local_out_dir_ok(self.bot_out_dir):
+            errors.append("bot_out_dir")
         return errors
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def _local_out_dir_ok(path: str) -> bool:
+    """Folderul documentelor pentru bot: cale completă, nu în clona DocAudit (care e în Google Drive)."""
+    p = Path(path)
+    if not p.is_absolute():
+        return False
+    clone = Path(__file__).resolve().parents[1]
+    try:
+        p.resolve().relative_to(clone)
+        return False
+    except ValueError:
+        return True
 
 
 def settings_path() -> Path:

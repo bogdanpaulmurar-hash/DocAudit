@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docaudit"
-version = "0.1.8"
+version = "0.1.9"
 description = "Verificator local de documentație exportată din OneNote"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["pypdf>=4"]  # „Export pentru bot”: unirea PDF-urilor
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

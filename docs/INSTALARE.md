@@ -90,7 +90,15 @@ DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în br
 - DocAudit încearcă singur mai multe căi de citire (PowerShell, pywin32, comtypes, legarea dinamică) și o ține minte pe cea care merge, deci căderea ar trebui să apară cel mult de câteva ori, doar la prima extragere.
 - Dacă extragerea se oprește cu „OneNote cade la citirea paginilor pe toate căile”, trimite-mi logul (Setări → Log tehnic). Ca DocAudit să încerce din nou toate căile, șterge fișierul `%LOCALAPPDATA%\DocAudit\data\onenote_read.json`.
 
-## 9. Limbă și curățenie
+## 9. Export pentru bot (în locul scriptului vechi „1. Updating Script”)
+- Ecranul **Export pentru bot**: paginile curățate devin PDF-uri pentru botul de documentație. Întâi „Analiză” și deciziile din „Grupuri”, ca paginile arhivate, învechite și duplicatele identice să rămână deoparte.
+- Alege „Un document pe” (notebook / folder de sus / secțiune) și limita pe fișier (95 MB, botul primește maxim 100 MB). La „Folderul documentelor” poți pune folderul din care încarci în bot (cale completă, pe disc local sau OneDrive de firmă, **nu** în `G:\My Drive\Dev\DocAudit`).
+- Verifică lista: o pagină debifată nu intră; din „Lăsate deoparte” poți bifa o pagină ca să intre totuși. „↺ automat” anulează alegerea ta.
+- **Exportă**: fiecare pagină devine PDF prin OneNote (`Publish`, doar fișiere pe disc; OneNote nu se schimbă). Dacă PDF-ul nu merge, se încearcă prin Word, apoi prin pagina web, apoi din textul extras. Prima dată durează (pe 700 de pagini, probabil zeci de minute); după aceea se refolosesc PDF-urile paginilor neschimbate.
+- La final: încarcă în bot **doar** fișierele din „De reîncărcat în bot”. Paginile din „De verificat de mână” (secțiuni cu parolă, pagini pe care OneNote nu le-a putut exporta) exportă-le tu din OneNote: Fișier → Export → Pagină → PDF.
+- Primul test: pune limita mică (de ex. 5 MB) și „Un document pe: secțiune” pe o extragere mică, ca să vezi cum se împart fișierele.
+
+## 10. Limbă și curățenie
 - Limba se schimbă din interfață. În linia de comandă: `set DOCAUDIT_LANG=en` sau `set DOCAUDIT_LANG=de` înainte de comenzi.
 - Notebook-ul de test se închide din OneNote (clic dreapta → Închide acest notebook), iar folderul lui se poate șterge manual.
 - Dezinstalare: șterge folderul `%LOCALAPPDATA%\DocAudit` (dispar și datele extrase) și scurtăturile DocAudit.

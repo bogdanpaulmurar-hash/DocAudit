@@ -80,6 +80,8 @@ def run_worker(spec_path: Path) -> int:
     cancel_path = spec_path.with_suffix(".cancel")
     state = {"state": "running", "done": 0, "total": 0}
     _write_status(status_path, state)
+    if spec.get("kind") == "bot":
+        return _run_bot(spec, status_path, cancel_path, state)
 
     def progress(n: int, total: int, _title: str) -> None:
         state.update(done=n, total=total)
@@ -116,6 +118,34 @@ def run_worker(spec_path: Path) -> int:
         "name": spec["name"], "total": report.total, "fetched": report.fetched, "reused": report.reused,
         "skipped": report.skipped, "removed": report.removed, "errors": report.errors[:50],
         "error_count": len(report.errors), "cancelled": report.cancelled, "seconds": round(report.seconds)}})
+    return 0
+
+
+def _run_bot(spec: dict, status_path: Path, cancel_path: Path, state: dict) -> int:
+    """„Export pentru bot” (tot în procesul separat: Publish poate bloca OneNote ca și citirea)."""
+    from ..bot.export import ExportAborted, export
+
+    def progress(n: int, total: int) -> None:
+        state.update(done=n, total=total)
+        _write_status(status_path, state)
+
+    try:
+        result = export(Path(spec["folder"]), out_dir=Path(spec["out_dir"]) if spec.get("out_dir") else None,
+                        max_mb=float(spec.get("max_mb", 95)), level=spec.get("level", "top"),
+                        skip_stale=bool(spec.get("skip_stale", True)),
+                        skip_duplicates=bool(spec.get("skip_duplicates", True)), full=bool(spec.get("full")),
+                        progress=progress, cancel=cancel_path.exists)
+    except ExportAborted as e:
+        log.get("bot").error("Exportul pentru bot s-a oprit: %s", log.describe_error(e))
+        _write_status(status_path, {"state": "error", "error": "ui.error.onenote", "params": {"error": str(e)}})
+        return 2
+    except Exception as e:
+        log.get("bot").exception("Exportul pentru bot a picat: %s", log.describe_error(e))
+        _write_status(status_path, {"state": "error", "error": "ui.error.internal",
+                                    "params": {"error": f"{type(e).__name__}: {e}"}})
+        return 3
+    _write_status(status_path, {"state": "done", "done": state["done"], "total": state["total"],
+                                "result": result.to_dict()})
     return 0
 
 

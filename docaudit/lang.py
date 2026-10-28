@@ -3,6 +3,7 @@
 - detect_language(): ghicește limba unei pagini după cuvinte frecvente (fără biblioteci).
 - STALE_MARKERS: expresii care arată că o pagină e învechită, în cele trei limbi
   (folosite la compararea din Etapa 5; se pot extinde din setări).
+- is_untitled(): titlul pus automat de OneNote unei pagini fără titlu, în cele trei limbi.
 """
 
 from __future__ import annotations
@@ -46,3 +47,18 @@ def stale_markers_in(text: str) -> list[str]:
             if f" {nm} " in norm and nm not in found:
                 found.append(nm)
     return found
+
+
+# titlurile puse automat de OneNote (sau lăsate de utilizator) unei pagini fără titlu
+UNTITLED_TITLES = {
+    "ro": ("fara titlu", "pagina fara titlu", "pagina noua", "pagina"),
+    "en": ("untitled", "untitled page", "new page", "page"),
+    "de": ("unbenannt", "unbenannte seite", "ohne titel", "neue seite", "seite"),
+}
+_UNTITLED = {normalize(x) for titles in UNTITLED_TITLES.values() for x in titles}
+
+
+def is_untitled(title: str) -> bool:
+    """Titlu gol sau „Untitled page 2” / „Fără titlu” / „Unbenannte Seite” (cu sau fără număr)."""
+    words = [w for w in normalize(title).replace("_", " ").split() if not w.isdigit()]
+    return not words or " ".join(words) in _UNTITLED
