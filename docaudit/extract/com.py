@@ -22,7 +22,9 @@ PI_BASIC = 0  # PageInfo.piBasic: fără imagini (rezerva pentru paginile la car
 PI_BINARY_DATA = 1  # PageInfo.piBinaryData: imaginile vin în XML, ca base64
 PAUSE = 0.05  # pauză mică între pagini, ca OneNote să nu fie bombardat (scriptul vechi: 150 ms)
 RECOVER = 5  # după ce OneNote a căzut: cât îl lăsăm să se închidă de tot înainte de cererea următoare
-WAYS = ("pywin32", "powershell", "comtypes", "dinamic")  # căile de citire a paginilor, în ordinea încercării
+# căile de citire a paginilor, în ordinea încercării; PowerShell întâi: pe laptopul de lucru
+# pywin32 făcea OneNote să cadă la fiecare pagină, iar PowerShell (ca scriptul vechi) mergea
+WAYS = ("powershell", "pywin32", "comtypes", "dinamic")
 READ_MEMORY = "onenote_read.json"  # ce cale a mers / ce cale face OneNote să cadă pe laptopul acesta
 
 
@@ -153,9 +155,19 @@ class ReadOnlyOneNote:
                 continue
             except OneNoteGone as e:
                 if not self._way_ok:
-                    self._give_up(way, crashed=True, why=e)
                     time.sleep(RECOVER)
-                    continue
+                    try:  # poate doar imaginile îl fac să cadă: o dată fără imagini, pe aceeași cale
+                        xml = self._page_call(way, page_id, PI_BASIC)
+                    except OneNoteGone as e2:
+                        self._give_up(way, crashed=True, why=e2)
+                        time.sleep(RECOVER)
+                        continue
+                    except (RuntimeError, AttributeError, TypeError):
+                        self._give_up(way, crashed=True, why=e)
+                        continue
+                    self.without_images += 1
+                    lg.warning("Prima pagină s-a citit doar fără imagini după ce OneNote a căzut (%s)", way)
+                    return self._mark_ok(way, xml)
                 lg.warning("%s la o pagină; o cer din nou fără imagini", e)
                 time.sleep(RECOVER)
                 try:
@@ -173,13 +185,16 @@ class ReadOnlyOneNote:
                     self._give_up(way, crashed=False, why=e)
                     continue
                 raise OneNoteError(str(e)) from e
-            if not self._way_ok:
-                self._way_ok = True
-                lg.info("Paginile se citesc prin: %s", way)
-                if self._memory.get("ok") != way:
-                    self._memory["ok"] = way
-                    save_read_memory(self._memory)
-            return xml
+            return self._mark_ok(way, xml)
+
+    def _mark_ok(self, way: str, xml: str) -> str:
+        if not self._way_ok:
+            self._way_ok = True
+            log.get("com").info("Paginile se citesc prin: %s", way)
+            if self._memory.get("ok") != way:
+                self._memory["ok"] = way
+                save_read_memory(self._memory)
+        return xml
 
     def _init_ways(self) -> None:
         self._memory = load_read_memory()

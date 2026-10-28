@@ -1,10 +1,10 @@
 # CHANGELOG — DocAudit
 
 ## 0.1.7 — 2026-10-28
-- Reparat: pe laptopul de lucru OneNote cădea la **fiecare** citire de pagină prin pywin32 (lista de notebook-uri mergea), iar DocAudit îl repornea la fiecare pagină, deci fereastra „How do you want to start OneNote?” apărea mereu. Acum, dacă o cale de citire face OneNote să cadă înainte de prima pagină reușită, DocAudit trece la următoarea: **PowerShell** (ca scriptul vechi de export), apoi comtypes, apoi legarea dinamică. Calea care merge și cea care face OneNote să cadă se țin minte în `data\onenote_read.json`, ca rularea următoare să nu mai provoace căderea. Dacă toate căile fac OneNote să cadă, extragerea se oprește la prima pagină, cu un mesaj clar.
+- Reparat: pe laptopul de lucru OneNote cădea la **fiecare** citire de pagină prin pywin32 (lista de notebook-uri mergea), iar DocAudit îl repornea la fiecare pagină, deci fereastra „How do you want to start OneNote?” apărea mereu. Acum, dacă o cale de citire face OneNote să cadă înainte de prima pagină reușită, paginile se citesc întâi prin **PowerShell** (ca scriptul vechi de export; Bogdan a confirmat că așa OneNote nu cade), apoi pywin32, comtypes, legarea dinamică. O cale care face OneNote să cadă la prima pagină mai primește o încercare fără imagini, apoi DocAudit trece la următoarea. Calea care merge și cea care face OneNote să cadă se țin minte în `data\onenote_read.json`, ca rularea următoare să nu mai provoace căderea. Dacă toate căile fac OneNote să cadă, extragerea se oprește la prima pagină, cu un mesaj clar.
 - Logul arată acum și de ce n-au mers variantele de legătură dinainte (de exemplu „OneNote.Application”) și pe ce cale se citesc paginile.
 - „Oprește” și oprirea după 3 minute închid și procesul PowerShell pornit de extragere.
-- Teste: 141 trecute (`pytest -q`, Linux), inclusiv trecerea la altă cale după o cădere, ținerea minte între rulări și oprirea când toate căile cad.
+- Teste: 142 trecute (`pytest -q`, Linux), inclusiv trecerea la altă cale după o cădere, ținerea minte între rulări și oprirea când toate căile cad.
 - Livrare: `git pull`, apoi din nou `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
 
 ## 0.1.6 — 2026-10-28

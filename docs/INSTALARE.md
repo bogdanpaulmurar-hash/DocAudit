@@ -87,7 +87,7 @@ DocAudit citește doar din **OneNote desktop**. Un notebook deschis numai în br
 
 ### OneNote cade la fiecare pagină
 - Semn: fereastra „How do you want to start OneNote?” apare iar și iar în timpul extragerii. Alege de fiecare dată **Start Normally**; nu șterge cache-ul sau setările (se pot pierde modificări nesincronizate).
-- DocAudit încearcă singur mai multe căi de citire (pywin32, PowerShell, comtypes, legarea dinamică) și o ține minte pe cea care merge, deci căderea ar trebui să apară cel mult de câteva ori, doar la prima extragere.
+- DocAudit încearcă singur mai multe căi de citire (PowerShell, pywin32, comtypes, legarea dinamică) și o ține minte pe cea care merge, deci căderea ar trebui să apară cel mult de câteva ori, doar la prima extragere.
 - Dacă extragerea se oprește cu „OneNote cade la citirea paginilor pe toate căile”, trimite-mi logul (Setări → Log tehnic). Ca DocAudit să încerce din nou toate căile, șterge fișierul `%LOCALAPPDATA%\DocAudit\data\onenote_read.json`.
 
 ## 9. Limbă și curățenie

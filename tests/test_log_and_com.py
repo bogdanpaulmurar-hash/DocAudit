@@ -200,7 +200,7 @@ def test_readonly_first_page_crash_with_no_other_way_stops(monkeypatch, tmp_path
     from docaudit.extract import com, psbridge
 
     monkeypatch.setattr(psbridge.shutil, "which", lambda name: None)  # fără PowerShell
-    ro = _readonly(CrashingOneNote(crashes=1), monkeypatch, tmp_path)
+    ro = _readonly(CrashingOneNote(crashes=2), monkeypatch, tmp_path)  # cade cu și fără imagini
     with pytest.raises(com.OneNoteError, match="toate căile") as e:
         ro.get_page_xml("p")
     assert e.value.fatal and com.load_read_memory()["crashed"] == ["pywin32"]
@@ -244,33 +244,44 @@ def test_page_way_switches_after_crash_and_is_remembered(monkeypatch, tmp_path):
 
     calls = []
 
-    def pywin32(pid, info):
-        calls.append(("pywin32", pid))
+    def powershell(pid, info):
+        calls.append(("powershell", pid, info))
         raise _gone()
 
-    def powershell(pid, info):
-        calls.append(("powershell", pid))
+    def pywin32(pid, info):
+        calls.append(("pywin32", pid, info))
         return f"<page id='{pid}' info='{info}'/>"
 
-    ro, started = _ways(monkeypatch, tmp_path, {"pywin32": pywin32, "powershell": powershell})
+    ro, started = _ways(monkeypatch, tmp_path, {"powershell": powershell, "pywin32": pywin32})
     assert ro.get_page_xml("a") == "<page id='a' info='1'/>"
     assert ro.get_page_xml("b").startswith("<page id='b'")
-    assert calls == [("pywin32", "a"), ("powershell", "a"), ("powershell", "b")]  # o singură cădere
-    assert com.load_read_memory() == {"crashed": ["pywin32"], "ok": "powershell"}
-    ro2, started2 = _ways(monkeypatch, tmp_path, {"pywin32": pywin32, "powershell": powershell})
+    assert calls == [("powershell", "a", 1), ("powershell", "a", 0),  # cu imagini, apoi o dată fără
+                     ("pywin32", "a", 1), ("pywin32", "b", 1)]
+    assert com.load_read_memory() == {"crashed": ["powershell"], "ok": "pywin32"}
+    ro2, started2 = _ways(monkeypatch, tmp_path, {"powershell": powershell, "pywin32": pywin32})
     ro2.get_page_xml("c")
-    assert started2 == ["powershell"] and len(calls) == 4  # rularea următoare nu mai face OneNote să cadă
+    assert started2 == ["pywin32"] and len(calls) == 5  # rularea următoare nu mai face OneNote să cadă
+
+
+def test_first_page_only_without_images_keeps_the_way(monkeypatch, tmp_path):
+    def powershell(pid, info):
+        if info == 1:
+            raise _gone()
+        return "<page info='0'/>"
+
+    ro, started = _ways(monkeypatch, tmp_path, {"powershell": powershell})
+    assert ro.get_page_xml("a") == "<page info='0'/>" and ro.without_images == 1 and ro._way == "powershell"
 
 
 def test_page_way_unusable_is_skipped_without_crash(monkeypatch, tmp_path):
     from docaudit.extract import com
 
     ro, started = _ways(monkeypatch, tmp_path, {
-        "pywin32": lambda pid, info: (_ for _ in ()).throw(AttributeError("GetPageContent")),
         "powershell": com._Unusable("PowerShell nu a fost găsit"),
+        "pywin32": lambda pid, info: (_ for _ in ()).throw(AttributeError("GetPageContent")),
         "comtypes": lambda pid, info: "<page/>"})
     assert ro.get_page_xml("a") == "<page/>"
-    assert started == ["pywin32", "powershell", "comtypes"]
+    assert started == ["powershell", "pywin32", "comtypes"]
     assert com.load_read_memory() == {"ok": "comtypes"}  # nimic marcat „cade”
 
 
@@ -285,7 +296,7 @@ def test_all_ways_crash_stops_extraction_at_first_page(monkeypatch, tmp_path):
     ro.get_hierarchy_xml = hier.get_hierarchy_xml
     report = extract_to_dataset(ro, Selection(), tmp_path / "x")
     assert report.aborted and "toate căile" in report.aborted and len(report.errors) == 1
-    assert started == list(com.WAYS)  # fiecare cale o singură dată, apoi stop
+    assert list(dict.fromkeys(started)) == list(com.WAYS) and len(started) == 2 * len(com.WAYS)  # cu și fără imagini, apoi stop
 
 
 def test_page_that_crashes_after_way_works_is_read_without_images(monkeypatch, tmp_path):
