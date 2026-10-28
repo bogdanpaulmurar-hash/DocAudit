@@ -38,14 +38,23 @@ class ReadOnlyOneNote:
             raise OneNoteError("pywin32 lipsește (pip install pywin32) sau sistemul nu e Windows") from e
         pythoncom.CoInitialize()
         self._missing = pythoncom.Missing
-        try:
-            # gencache știe parametrii de ieșire ([out]) și îi întoarce ca rezultat
-            self._app = win32com.client.gencache.EnsureDispatch("OneNote.Application")
-        except Exception:  # pragma: no cover - doar pe Windows
-            try:
-                self._app = win32com.client.Dispatch("OneNote.Application")
-            except Exception as e:
-                raise OneNoteError("OneNote desktop nu răspunde prin COM") from e
+        self._app = None
+        problems: list[str] = []
+        # gencache știe parametrii de ieșire ([out]) și îi întoarce ca rezultat. Unele instalări
+        # Microsoft 365 au înregistrată biblioteca de tipuri doar sub „OneNote.Application.12”.
+        for make, progid in ((win32com.client.gencache.EnsureDispatch, "OneNote.Application"),
+                             (win32com.client.gencache.EnsureDispatch, "OneNote.Application.12"),
+                             (win32com.client.Dispatch, "OneNote.Application")):
+            try:  # pragma: no cover - doar pe Windows
+                self._app = make(progid)
+                break
+            except AttributeError as e:  # pragma: no cover - cache gen_py stricat
+                problems.append(f"{progid}: {e} (șterge folderul %LOCALAPPDATA%\\Temp\\gen_py)")
+            except Exception as e:  # pragma: no cover - doar pe Windows
+                problems.append(f"{progid}: {e}")
+        if self._app is None:  # pragma: no cover - doar pe Windows
+            raise OneNoteError("OneNote desktop nu răspunde prin COM (e instalat OneNote din Microsoft 365 / "
+                               "2016, nu doar „OneNote for Windows 10”?): " + "; ".join(problems))
 
     def get_hierarchy_xml(self) -> str:  # pragma: no cover - doar pe Windows
         return self._call("GetHierarchy", ("", HS_PAGES, self._missing, XS_2013), ("", HS_PAGES))

@@ -249,5 +249,21 @@
   "cli.icon.done": "Icon written: {path}",
   "tray.open": "Open DocAudit",
   "tray.quit": "Quit",
-  "tray.title": "DocAudit"
+  "tray.title": "DocAudit",
+  "cli.tree.link": "Browser link of a notebook: show which OneNote desktop notebook it matches",
+  "cli.tree.empty": "OneNote desktop returned no notebooks. Open the notebook in OneNote desktop (not in the browser), wait for it to sync and try again.",
+  "cli.tree.link.found": "Notebook: {notebook} · section: {section}",
+  "cli.tree.link.missing": "The notebook in the link is not open in OneNote desktop. Open it with the link below (or in OneNote on the web → “Open in Desktop App”), then try again.",
+  "ui.source.link": "Browser link (team notebook)",
+  "ui.source.link.placeholder": "https://…sharepoint.com/… or onenote:https://…",
+  "ui.source.link.find": "Find the notebook",
+  "ui.source.link.help": "Open the notebook in OneNote on the web and copy the address from the browser bar (or, in OneNote, right-click the notebook → Copy Link). DocAudit only reads the link as text, it does not open it.",
+  "ui.source.link.found": "Ticked: {name}. Press “Extract”.",
+  "ui.source.link.missing": "The notebook in the link is not open in OneNote desktop, and DocAudit only reads from OneNote desktop. Open it there (it syncs to this computer), then press “Find the notebook” again.",
+  "ui.source.link.open": "Open in OneNote desktop",
+  "ui.source.link.openweb": "The link does not contain the notebook path. In OneNote on the web choose “Open in Desktop App”, then try again (or copy the link from OneNote desktop: right-click the notebook → Copy Link).",
+  "ui.source.empty": "OneNote desktop returned no notebooks. Open the notebook in OneNote desktop (not only in the browser or in “OneNote for Windows 10”), wait for it to sync and try again. For a team notebook you can paste its browser link below.",
+  "ui.source.treefail": "Could not read the notebooks from OneNote.",
+  "ui.source.treehelp": "Check: OneNote desktop (Microsoft 365 / 2016) is installed and running; DocAudit was installed with Install.bat (pywin32). Details: DocAudit.bat tree on the command line. Without COM you can export pages as .docx / .mht and use DocAudit.bat import-files.",
+  "ui.error.link": "Not a OneNote link: it must start with https:// or onenote:https://."
 }

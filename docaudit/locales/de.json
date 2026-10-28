@@ -249,5 +249,21 @@
   "cli.icon.done": "Symbol geschrieben: {path}",
   "tray.open": "DocAudit öffnen",
   "tray.quit": "Beenden",
-  "tray.title": "DocAudit"
+  "tray.title": "DocAudit",
+  "cli.tree.link": "Browser-Link eines Notizbuchs: zeigt, welches Notizbuch in OneNote Desktop dazu passt",
+  "cli.tree.empty": "OneNote Desktop hat keine Notizbücher geliefert. Öffne das Notizbuch in OneNote Desktop (nicht im Browser), warte auf die Synchronisierung und versuche es erneut.",
+  "cli.tree.link.found": "Notizbuch: {notebook} · Abschnitt: {section}",
+  "cli.tree.link.missing": "Das Notizbuch aus dem Link ist in OneNote Desktop nicht geöffnet. Öffne es mit dem Link unten (oder in OneNote im Web → „In Desktop-App öffnen“) und versuche es erneut.",
+  "ui.source.link": "Browser-Link (Team-Notizbuch)",
+  "ui.source.link.placeholder": "https://…sharepoint.com/… oder onenote:https://…",
+  "ui.source.link.find": "Notizbuch finden",
+  "ui.source.link.help": "Öffne das Notizbuch in OneNote im Web und kopiere die Adresse aus der Adressleiste (oder in OneNote: Rechtsklick auf das Notizbuch → Link kopieren). DocAudit liest den Link nur als Text und öffnet ihn nicht.",
+  "ui.source.link.found": "Angehakt: {name}. Klicke auf „Extrahieren“.",
+  "ui.source.link.missing": "Das Notizbuch aus dem Link ist in OneNote Desktop nicht geöffnet, und DocAudit liest nur aus OneNote Desktop. Öffne es dort (es wird auf diesen Computer synchronisiert) und klicke dann erneut auf „Notizbuch finden“.",
+  "ui.source.link.open": "In OneNote Desktop öffnen",
+  "ui.source.link.openweb": "Der Link enthält den Pfad des Notizbuchs nicht. Wähle in OneNote im Web „In Desktop-App öffnen“ und versuche es erneut (oder kopiere den Link in OneNote Desktop: Rechtsklick auf das Notizbuch → Link kopieren).",
+  "ui.source.empty": "OneNote Desktop hat keine Notizbücher geliefert. Öffne das Notizbuch in OneNote Desktop (nicht nur im Browser oder in „OneNote für Windows 10“), warte auf die Synchronisierung und versuche es erneut. Für ein Team-Notizbuch kannst du unten den Browser-Link einfügen.",
+  "ui.source.treefail": "Die Notizbücher konnten nicht aus OneNote gelesen werden.",
+  "ui.source.treehelp": "Prüfe: OneNote Desktop (Microsoft 365 / 2016) ist installiert und läuft; DocAudit wurde mit Install.bat installiert (pywin32). Details: DocAudit.bat tree in der Befehlszeile. Ohne COM kannst du Seiten als .docx / .mht exportieren und DocAudit.bat import-files verwenden.",
+  "ui.error.link": "Kein OneNote-Link: Er muss mit https:// oder onenote:https:// beginnen."
 }

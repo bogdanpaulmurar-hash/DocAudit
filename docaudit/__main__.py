@@ -55,6 +55,24 @@ def _selection(args: argparse.Namespace):
                      exclude_sections=args.exclude if args.exclude is not None else [DEFAULT_ARCHIVE])
 
 
+def _tree_link(hierarchy, link: str) -> int:
+    from .extract.links import LinkError, match_link, parse_link
+
+    try:
+        info = parse_link(link)
+    except LinkError:
+        print(t("ui.error.link"))
+        return 2
+    m = match_link(hierarchy, info)
+    if m is None:
+        print(t("cli.tree.link.missing"))
+        if info.open_url:
+            print(f"  {info.open_url}")
+        return 1
+    print(t("cli.tree.link.found", notebook=m.notebook, section=m.section or "-"))
+    return 0
+
+
 def _source(demo: bool):
     if demo:
         from .extract.demo import DemoOneNote
@@ -103,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_tree = sub.add_parser("tree", help=t("cli.tree.help"))
     p_tree.add_argument("--demo", action="store_true", help=t("cli.extract.demo"))
+    p_tree.add_argument("--link", help=t("cli.tree.link"))
 
     p_ext = sub.add_parser("extract", help=t("cli.extract.help"))
     _add_selection_args(p_ext)
@@ -262,8 +281,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "tree":
         from .extract.onenote_xml import parse_hierarchy
 
-        for nb in parse_hierarchy(source.get_hierarchy_xml()).notebooks:
-            print(nb.name)
+        try:
+            hierarchy = parse_hierarchy(source.get_hierarchy_xml())
+        except OneNoteError as e:
+            print(t("cli.onenote.unavailable", error=e))
+            return 2
+        if args.link:
+            return _tree_link(hierarchy, args.link)
+        if not hierarchy.notebooks:
+            print(t("cli.tree.empty"))
+            return 1
+        for nb in hierarchy.notebooks:
+            print(f"{nb.name}  [{nb.location}]" if nb.location else nb.name)
             for sec in nb.sections:
                 print(f"  {'/'.join(sec.path)} — {t('cli.tree.pages', count=len(sec.pages))}")
         return 0
@@ -271,10 +300,14 @@ def main(argv: list[str] | None = None) -> int:
     from .extract.run import extract_to_dataset
 
     out = resolve_folder(args.out) if args.out else data_dir() / (args.profile or ("demo" if args.demo else "onenote"))
-    report = extract_to_dataset(
-        source, _selection(args), out, incremental=not args.full, source_label=label,
-        progress=lambda n, total, title: print(t("cli.extract.progress", n=n, total=total, title=title)),
-    )
+    try:
+        report = extract_to_dataset(
+            source, _selection(args), out, incremental=not args.full, source_label=label,
+            progress=lambda n, total, title: print(t("cli.extract.progress", n=n, total=total, title=title)),
+        )
+    except OneNoteError as e:
+        print(t("cli.onenote.unavailable", error=e))
+        return 2
     for e in report.errors:
         print(t("cli.extract.error", error=e))
     print(t("cli.extract.done", total=report.total, fetched=report.fetched, reused=report.reused,

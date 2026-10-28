@@ -123,3 +123,7 @@ mark.diff { background: var(--mark-strong); }
   .top, .glist, .actions, .banner { display: none; }
   .groups { grid-template-columns: 1fr; }
 }
+
+.notice { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 8px 12px; background: var(--panel); }
+.notice.err { border-left-color: var(--high); }
+a.button { display: inline-block; border: 1px solid var(--accent); padding: 6px 12px; border-radius: 8px; text-decoration: none; }

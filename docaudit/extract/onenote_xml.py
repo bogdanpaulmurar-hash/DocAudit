@@ -52,6 +52,7 @@ class HSection:
     notebook: str
     path: list[str]
     pages: list[HPage] = field(default_factory=list)
+    location: str = ""  # fișierul .one (local sau https://…), cum îl dă OneNote
 
 
 @dataclass
@@ -59,6 +60,7 @@ class HNotebook:
     id: str
     name: str
     sections: list[HSection] = field(default_factory=list)
+    location: str = ""  # folderul notebook-ului (local sau https://…)
 
 
 @dataclass
@@ -83,25 +85,42 @@ def _deleted(el: ET.Element) -> bool:
     return any(el.get(a) == "true" for a in RECYCLE_BIN_ATTRS)
 
 
+def _local(tag: str) -> str:
+    """„{ns}Notebook” → „Notebook”: OneNote dă schema 2010 sau 2013, după versiune."""
+    return tag.rsplit("}", 1)[-1]
+
+
+def _as_2013(root: ET.Element) -> ET.Element:
+    """Aduce etichetele din schema 2010 la 2013 (aceleași nume pentru ce citim)."""
+    for el in root.iter():
+        if el.tag.startswith("{http://schemas.microsoft.com/office/onenote/") and not el.tag.startswith(ONE):
+            el.tag = ONE + _local(el.tag)
+    return root
+
+
 def parse_hierarchy(xml: str) -> Hierarchy:
     """Ierarhia completă, fără Coșul de reciclare OneNote."""
     root = ET.fromstring(xml)
     notebooks: list[HNotebook] = []
-    for nb_el in root.iter(f"{ONE}Notebook"):
+    for nb_el in root.iter():
+        if _local(nb_el.tag) != "Notebook":
+            continue
         name = nb_el.get("nickname") or nb_el.get("name") or "?"
-        nb = HNotebook(id=nb_el.get("ID", ""), name=name)
+        nb = HNotebook(id=nb_el.get("ID", ""), name=name, location=nb_el.get("path", ""))
 
         def walk(container: ET.Element, path: list[str]) -> None:
             for child in container:
                 if _deleted(child):
                     continue
-                if child.tag == f"{ONE}SectionGroup":
+                kind = _local(child.tag)
+                if kind == "SectionGroup":
                     walk(child, path + [child.get("name", "?")])
-                elif child.tag == f"{ONE}Section":
+                elif kind == "Section":
                     sec_path = path + [child.get("name", "?")]
-                    sec = HSection(id=child.get("ID", ""), notebook=name, path=sec_path)
-                    for p in child.findall(f"{ONE}Page"):
-                        if _deleted(p):
+                    sec = HSection(id=child.get("ID", ""), notebook=name, path=sec_path,
+                                   location=child.get("path", ""))
+                    for p in child:
+                        if _local(p.tag) != "Page" or _deleted(p):
                             continue
                         sec.pages.append(HPage(
                             id=p.get("ID", ""), title=p.get("name", ""),
@@ -153,7 +172,7 @@ def _position(el: ET.Element) -> tuple[float, float]:
 def parse_page(xml: str, notebook: str, section_path: list[str],
                kind: str = "onenote_com") -> tuple[Page, dict[str, ImageData]]:
     """O pagină OneNote → Page + imaginile ei (după hash). Nu scrie nimic."""
-    root = ET.fromstring(xml)
+    root = _as_2013(ET.fromstring(xml))
     styles = {s.get("index"): s.get("name", "") for s in root.findall(f"{ONE}QuickStyleDef")}
     blocks: list[Block] = []
     lines: list[str] = []
@@ -298,22 +317,29 @@ def render_page_xml(page: Page, images: dict[str, ImageData] | None = None,
     return ET.tostring(root, encoding="unicode")
 
 
-def render_hierarchy_xml(pages: list[Page]) -> str:
-    """Pagini → XML de ierarhie (notebook-uri, grupuri de secțiuni, secțiuni)."""
+def render_hierarchy_xml(pages: list[Page], location_base: str | None = None) -> str:
+    """Pagini → XML de ierarhie (notebook-uri, grupuri de secțiuni, secțiuni).
+
+    Cu `location_base` (de exemplu un site SharePoint fictiv), notebook-urile și
+    secțiunile primesc și atributul `path`, ca în OneNote.
+    """
     root = ET.Element(f"{ONE}Notebooks")
     nbs: dict[str, ET.Element] = {}
     containers: dict[tuple[str, ...], ET.Element] = {}
     for p in pages:
         if p.notebook not in nbs:
             nbs[p.notebook] = _sub(root, "Notebook", name=p.notebook, nickname=p.notebook,
-                                   ID=f"nb:{p.notebook}")
+                                   ID=f"nb:{p.notebook}",
+                                   path=f"{location_base}/{p.notebook}/" if location_base else None)
         parent = nbs[p.notebook]
         for depth, name in enumerate(p.section_path):
             key = (p.notebook, *p.section_path[: depth + 1])
             if key not in containers:
                 last = depth == len(p.section_path) - 1
+                where = "/".join(key) + (".one" if last else "/")
                 containers[key] = _sub(parent, "Section" if last else "SectionGroup",
-                                       name=name, ID="sec:" + "/".join(key))
+                                       name=name, ID="sec:" + "/".join(key),
+                                       path=f"{location_base}/{where}" if location_base else None)
             parent = containers[key]
         _sub(parent, "Page", ID=p.id, name=p.title, dateTime=p.created,
              lastModifiedTime=p.modified, pageLevel="1")

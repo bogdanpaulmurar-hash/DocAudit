@@ -1,5 +1,14 @@
 # CHANGELOG — DocAudit
 
+## 0.1.2 — 2026-10-28
+- Reparat: în „Sursă” nu se putea alege niciun notebook. Eroarea de la OneNote apărea doar 7 secunde într-un mesaj jos, iar dacă OneNote desktop nu dădea niciun notebook, lista rămânea goală, fără explicație. Acum eroarea (sau lista goală) rămâne în pagină, cu ce e de verificat. Raportat de Bogdan.
+- Ierarhia și paginile se citesc și în schema XML OneNote 2010, nu doar 2013 (înainte ieșea o listă goală fără eroare).
+- COM: dacă `OneNote.Application` nu pornește, se încearcă și `OneNote.Application.12`, apoi legarea dinamică; mesajul spune ce a eșuat la fiecare (inclusiv un cache `gen_py` stricat).
+- Nou: câmpul „Link din browser (notebook de echipă)” în „Sursă”. Lipești adresa notebook-ului din OneNote pe web (SharePoint / OneDrive, `:o:/r/`, `onenote.aspx?id=`, `Doc.aspx?…wd=target(…)`, `onenote:https://…`) și DocAudit bifează notebook-ul (sau secțiunea) din OneNote desktop. Dacă notebook-ul nu e deschis în OneNote desktop, apare butonul „Deschide în OneNote desktop” (link `onenote:`), apoi se caută din nou. Link-ul e citit doar ca text: fără rețea, fără scriere în OneNote.
+- CLI: `tree` arată și adresa fiecărui notebook; `tree --link URL` spune ce notebook / secțiune îi corespunde. `tree` și `extract` nu mai ies cu traceback când OneNote refuză cererea.
+- Teste: 119 trecute (`pytest -q`, Linux, Python 3.13), inclusiv formele de link, schema 2010 și `/api/link`.
+- Livrare: `git pull`, apoi din nou `Install.bat`.
+
 ## 0.1.1 — 2026-10-28
 - Reparat: `Install.bat` se oprea la „Creez iconita si scurtaturile” cu `UnicodeEncodeError` (cp1252). Pe Windows, ieșirea redirecționată nu putea scrie diacriticele din mesaje („Iconiță”). Acum DocAudit scrie mereu în UTF-8, iar `Install.bat` setează și `PYTHONIOENCODING=utf-8`. Găsit de Bogdan la prima instalare (Python 3.14).
 - Teste: 109 trecute.

@@ -94,12 +94,12 @@ def api_page(q: dict) -> dict:
     return page.to_dict()
 
 
-def api_tree(q: dict) -> dict:
+def _hierarchy(demo: bool):
     from ..extract.com import OneNoteError
     from ..extract.onenote_xml import parse_hierarchy
 
     try:
-        if q.get("demo") == "1":
+        if demo:
             from ..extract.demo import DemoOneNote
 
             source = DemoOneNote()
@@ -107,12 +107,29 @@ def api_tree(q: dict) -> dict:
             from ..extract.com import ReadOnlyOneNote
 
             source = ReadOnlyOneNote()
-        h = parse_hierarchy(source.get_hierarchy_xml())
+        return parse_hierarchy(source.get_hierarchy_xml())
     except OneNoteError as e:
         raise ApiError(503, "ui.error.onenote", error=str(e))
-    return {"notebooks": [{"name": nb.name, "sections": [
+
+
+def api_tree(q: dict) -> dict:
+    h = _hierarchy(q.get("demo") == "1")
+    return {"notebooks": [{"name": nb.name, "location": nb.location, "sections": [
         {"path": "/".join(s.path), "pages": [{"id": p.id, "title": p.title, "modified": p.modified} for p in s.pages]}
         for s in nb.sections]} for nb in h.notebooks]}
+
+
+def api_link(body: dict) -> dict:
+    """Link-ul din browser → notebook-ul (și secțiunea) din OneNote desktop. Fără rețea."""
+    from ..extract.links import LinkError, match_link, parse_link
+
+    try:
+        info = parse_link(str(body.get("link") or ""))
+    except LinkError:
+        raise ApiError(400, "ui.error.link")
+    m = match_link(_hierarchy(bool(body.get("demo"))), info)
+    return {"found": m is not None, "notebook": m and m.notebook, "section": m and m.section,
+            "page": info.page, "open_url": info.open_url}
 
 
 def api_extract(body: dict) -> dict:
@@ -260,7 +277,7 @@ GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_
               "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,
-               "/api/settings": api_settings}
+               "/api/settings": api_settings, "/api/link": api_link}
 WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore"}
 
 

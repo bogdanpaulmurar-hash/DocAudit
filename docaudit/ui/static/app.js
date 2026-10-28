@@ -164,12 +164,55 @@ async function viewSource() {
   const out = h("div", { class: "muted" });
   demo.onchange = () => { if (demo.checked && name.value === "onenote") name.value = "demo"; };
 
+  const link = h("input", { type: "text", placeholder: t("ui.source.link.placeholder"), size: 48 });
+  const linkOut = h("div", { class: "small" });
+
+  // Eroarea rămâne în pagină (nu doar câteva secunde într-un toast), cu ce e de verificat.
   async function loadTree() {
     treeBox.replaceChildren(h("p", { class: "muted", text: t("ui.loading") }));
-    await guard(async () => {
+    try {
       S.tree = await api("/api/tree" + q({ demo: demo.checked ? "1" : "0" }));
-      treeBox.replaceChildren(renderTree(S.tree));
-    });
+    } catch (e) {
+      S.tree = null;
+      treeBox.replaceChildren(h("div", { class: "notice err" },
+        h("p", {}, h("strong", { text: t("ui.source.treefail") })), h("p", { text: e.message }),
+        h("p", { class: "small", text: t("ui.source.treehelp") })));
+      return false;
+    }
+    treeBox.replaceChildren(S.tree.notebooks.length ? renderTree(S.tree)
+      : h("p", { class: "notice", text: t("ui.source.empty") }));
+    return S.tree.notebooks.length > 0;
+  }
+
+  function tick(kind, value) {
+    const cb = [...treeBox.querySelectorAll(`input[data-kind="${kind}"]`)].find(x => x.dataset.value === value);
+    if (!cb) return false;
+    if (!cb.checked) { cb.checked = true; cb.dispatchEvent(new Event("change")); }
+    const det = cb.closest("details");
+    if (det) det.open = true;
+    cb.scrollIntoView({ block: "center" });
+    return true;
+  }
+
+  async function findLink() {
+    linkOut.replaceChildren(h("span", { class: "muted", text: t("ui.loading") }));
+    let r;
+    try {
+      r = await api("/api/link", { link: link.value, demo: demo.checked });
+    } catch (e) {
+      linkOut.replaceChildren(h("p", { class: "notice err", text: e.message }));
+      return;
+    }
+    if (r.found) {
+      await loadTree(); // arborele proaspăt, apoi bifa
+      const bySection = r.section && tick("sections", r.section);
+      if (!bySection) tick("notebooks", r.notebook);
+      linkOut.replaceChildren(h("span", { text: t("ui.source.link.found", { name: bySection ? r.section : r.notebook }) }));
+      return;
+    }
+    linkOut.replaceChildren(h("p", { class: "notice", text: t("ui.source.link.missing") }),
+      r.open_url ? h("a", { href: r.open_url, class: "button", text: t("ui.source.link.open") })
+                 : h("p", { class: "muted", text: t("ui.source.link.openweb") }));
   }
 
   async function extract() {
@@ -205,6 +248,12 @@ async function viewSource() {
         h("label", {}, demo, " ", t("ui.source.demo")),
         h("button", { onclick: loadTree, text: t("ui.source.tree") })),
       treeBox,
+      h("div", { class: "stack" },
+        h("div", { class: "row" },
+          h("label", {}, t("ui.source.link"), " ", link),
+          h("button", { onclick: findLink, text: t("ui.source.link.find") })),
+        h("p", { class: "small muted", text: t("ui.source.link.help") }),
+        linkOut),
       h("div", { class: "row" },
         h("label", {}, t("ui.source.name"), " ", name),
         h("label", {}, t("ui.source.profile"), " ", profile),

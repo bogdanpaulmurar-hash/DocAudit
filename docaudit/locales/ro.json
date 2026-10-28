@@ -249,5 +249,21 @@
   "cli.icon.done": "Iconiță scrisă: {path}",
   "tray.open": "Deschide DocAudit",
   "tray.quit": "Închide",
-  "tray.title": "DocAudit"
+  "tray.title": "DocAudit",
+  "cli.tree.link": "Link-ul din browser al unui notebook: arată ce notebook din OneNote desktop îi corespunde",
+  "cli.tree.empty": "OneNote desktop nu a dat niciun notebook. Deschide notebook-ul în OneNote desktop (nu în browser), așteaptă sincronizarea și încearcă din nou.",
+  "cli.tree.link.found": "Notebook: {notebook} · secțiune: {section}",
+  "cli.tree.link.missing": "Notebook-ul din link nu e deschis în OneNote desktop. Deschide-l cu link-ul de mai jos (sau din OneNote pe web → „Deschide în aplicația desktop”), apoi încearcă din nou.",
+  "ui.source.link": "Link din browser (notebook de echipă)",
+  "ui.source.link.placeholder": "https://…sharepoint.com/… sau onenote:https://…",
+  "ui.source.link.find": "Găsește notebook-ul",
+  "ui.source.link.help": "Deschide notebook-ul în OneNote pe web și copiază adresa din bara browserului (sau, în OneNote, clic dreapta pe notebook → Copiază linkul). DocAudit citește link-ul doar ca text, nu îl deschide.",
+  "ui.source.link.found": "Bifat: {name}. Apasă „Extrage”.",
+  "ui.source.link.missing": "Notebook-ul din link nu e deschis în OneNote desktop, iar DocAudit citește doar din OneNote desktop. Deschide-l acolo (se sincronizează pe calculator), apoi apasă din nou „Găsește notebook-ul”.",
+  "ui.source.link.open": "Deschide în OneNote desktop",
+  "ui.source.link.openweb": "Link-ul nu conține calea notebook-ului. În OneNote pe web alege „Deschide în aplicația desktop”, apoi încearcă din nou (sau copiază link-ul din OneNote desktop: clic dreapta pe notebook → Copiază linkul).",
+  "ui.source.empty": "OneNote desktop nu a dat niciun notebook. Deschide notebook-ul în OneNote desktop (nu doar în browser sau în „OneNote for Windows 10”), așteaptă sincronizarea și încearcă din nou. Pentru un notebook de echipă poți lipi mai jos link-ul din browser.",
+  "ui.source.treefail": "Nu am putut citi notebook-urile din OneNote.",
+  "ui.source.treehelp": "Verifică: OneNote desktop (Microsoft 365 / 2016) e instalat și pornit; DocAudit e instalat cu Install.bat (pywin32). Detalii: DocAudit.bat tree în linia de comandă. Fără COM poți exporta paginile ca .docx / .mht și folosi DocAudit.bat import-files.",
+  "ui.error.link": "Nu e un link OneNote: trebuie să înceapă cu https:// sau onenote:https://."
 }
