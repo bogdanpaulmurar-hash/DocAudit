@@ -1,5 +1,11 @@
 # CHANGELOG — DocAudit
 
+## 0.1.8 — 2026-10-28
+- Nou: decizia **„Mută…”** în „Grupuri”, pentru o pagină pusă în secțiunea greșită. Se deschide lista secțiunilor din OneNote (citită doar pentru afișare), cu căutare; alegi secțiunea și, opțional, motivul. Mutarea se face doar la „De aplicat”, ca la arhivare: copie de siguranță, pagina nouă în secțiunea aleasă cu nota „Mutat din: …”, originalul în Coșul OneNote, și se poate restaura din „Arhivă și jurnal”. Jurnalele de decizii vechi primesc automat coloana nouă (`target`).
+- Reparat înainte să apară: „De aplicat” scria în OneNote prin pywin32, calea care pe laptopul de lucru făcea OneNote să cadă. Acum scrie prin PowerShell (`apply/pswriter.py`), ca citirea; pywin32 rămâne rezerva dacă PowerShell lipsește.
+- Teste: 146 trecute (`pytest -q`, Linux), inclusiv mutarea, previzualizarea („e deja acolo”, „secțiunea nu mai există”), restaurarea și migrarea jurnalului.
+- Livrare: `git pull`, apoi din nou `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.7 — 2026-10-28
 - Reparat: pe laptopul de lucru OneNote cădea la **fiecare** citire de pagină prin pywin32 (lista de notebook-uri mergea), iar DocAudit îl repornea la fiecare pagină, deci fereastra „How do you want to start OneNote?” apărea mereu. Acum, dacă o cale de citire face OneNote să cadă înainte de prima pagină reușită, paginile se citesc întâi prin **PowerShell** (ca scriptul vechi de export; Bogdan a confirmat că așa OneNote nu cade), apoi pywin32, comtypes, legarea dinamică. O cale care face OneNote să cadă la prima pagină mai primește o încercare fără imagini, apoi DocAudit trece la următoarea. Calea care merge și cea care face OneNote să cadă se țin minte în `data\onenote_read.json`, ca rularea următoare să nu mai provoace căderea. Dacă toate căile fac OneNote să cadă, extragerea se oprește la prima pagină, cu un mesaj clar.
 - Logul arată acum și de ce n-au mers variantele de legătură dinainte (de exemplu „OneNote.Application”) și pe ce cale se citesc paginile.

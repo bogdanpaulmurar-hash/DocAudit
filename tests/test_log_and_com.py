@@ -330,3 +330,34 @@ def test_powershell_reply_parsing():
         parse_reply("ERR -2147213292 page not found")
     for word in ("UpdatePageContent", "DeleteHierarchy", "UpdateHierarchy", "Publish", "CreateNewPage"):
         assert word not in SCRIPT  # scriptul doar citește
+
+
+def test_powershell_writer_commands_and_errors():
+    import base64
+
+    from docaudit.apply.pswriter import SCRIPT, PowerShellWriter
+    from docaudit.extract.com import OneNoteError
+    from docaudit.extract.psbridge import PowerShellProcess
+
+    sent = []
+
+    def fake_request(self, line, method):
+        sent.append(line)
+        if line.startswith("RECYCLE"):
+            raise RuntimeError("DeleteHierarchy (PowerShell): 0x80042014")
+        return "{id}"
+
+    w = PowerShellWriter.__new__(PowerShellWriter)
+    orig = PowerShellProcess.request
+    PowerShellProcess.request = fake_request
+    try:
+        assert w.create_page("{s}") == "{id}"
+        w.update_page("<one:Page ăî/>")
+        with pytest.raises(OneNoteError, match="0x80042014"):
+            w.delete_page("{p}")
+    finally:
+        PowerShellProcess.request = orig
+    assert sent[0] == "NEWPAGE\t" + base64.b64encode(b"{s}").decode()
+    assert base64.b64decode(sent[1].split("\t")[1]).decode() == "<one:Page ăî/>"
+    assert "DeleteHierarchy((Arg $p[1]), [DateTime]::MinValue, $false)" in SCRIPT  # în Coș, nu definitiv
+    assert "MinValue, $true" not in SCRIPT and "Publish" not in SCRIPT

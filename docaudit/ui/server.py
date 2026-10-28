@@ -10,6 +10,8 @@ Protecții:
 
 from __future__ import annotations
 
+import contextlib
+
 import json
 import mimetypes
 import secrets
@@ -344,8 +346,12 @@ def api_decision(body: dict) -> dict:
     action = body.get("action")
     if action not in ACTIONS or not body.get("page"):
         raise ApiError(400, "ui.error.action")
-    d = Journal(folder).add(body["page"], action, group_id=body.get("group", ""),
-                            finding=body.get("finding", ""), note=(body.get("note") or "")[:2000])
+    try:
+        d = Journal(folder).add(body["page"], action, group_id=body.get("group", ""),
+                                finding=body.get("finding", ""), note=(body.get("note") or "")[:2000],
+                                target=str(body.get("target") or "")[:1000])
+    except ValueError:
+        raise ApiError(400, "ui.error.action")
     if action == "not_in_group":
         group = next((g for g in load_groups(folder)["groups"] if body["page"] in g["pages"]), None)
         if group:
@@ -353,6 +359,26 @@ def api_decision(body: dict) -> dict:
             ov.detach(body["page"], group["pages"])
             ov.save(folder)
     return d.to_dict()
+
+
+def api_sections(q: dict) -> dict:
+    """Secțiunile în care se poate muta o pagină: din OneNote acum (doar citire), altfel din extragere."""
+    from ..apply.run import WriteDisabled, writer_for
+    from ..extract.com import OneNoteError
+    from ..extract.onenote_xml import parse_hierarchy
+
+    folder = _dataset(q.get("ds"))
+    try:
+        with _writer(writer_for(folder, load_settings().lang)) as w:
+            h = parse_hierarchy(w.get_hierarchy_xml())
+        items = [{"notebook": nb.name, "section": "/".join(sec.path)} for nb in h.notebooks for sec in nb.sections]
+        live = True
+    except (OneNoteError, WriteDisabled, RuntimeError) as e:
+        _lg.warning("api_sections: %s; folosesc secțiunile din extragere", log.describe_error(e))
+        seen = {(p.notebook, "/".join(p.section_path)) for p in read_pages(folder)}
+        items = [{"notebook": nb, "section": sec} for nb, sec in sorted(seen)]
+        live = False
+    return {"sections": items, "live": live}
 
 
 def api_undo(body: dict) -> dict:
@@ -363,6 +389,17 @@ def api_undo(body: dict) -> dict:
     return {"ok": True}
 
 
+@contextlib.contextmanager
+def _writer(w):
+    """Legătura de scriere se închide după fiecare cerere (procesul PowerShell nu rămâne pornit)."""
+    try:
+        yield w
+    finally:
+        close = getattr(w, "close", None)
+        if close:
+            close()
+
+
 def api_plan(q: dict) -> dict:
     from ..apply.run import WriteDisabled, plan, writer_for
     from ..extract.com import OneNoteError
@@ -370,7 +407,8 @@ def api_plan(q: dict) -> dict:
     folder = _dataset(q.get("ds"))
     settings = load_settings()
     try:
-        items = plan(folder, writer_for(folder, settings.lang), settings)
+        with _writer(writer_for(folder, settings.lang)) as w:
+            items = plan(folder, w, settings)
     except (OneNoteError, WriteDisabled) as e:
         raise ApiError(503, "ui.error.onenote", error=str(e))
     return {"items": [i.to_dict() for i in items], "write_enabled": settings.write_enabled}
@@ -388,7 +426,8 @@ def api_apply(body: dict) -> dict:
     if not ids or body.get("confirm") is not True:
         raise ApiError(400, "ui.error.confirm")
     try:
-        return apply(folder, writer_for(folder, settings.lang), settings, ids, settings.lang).to_dict()
+        with _writer(writer_for(folder, settings.lang)) as w:
+            return apply(folder, w, settings, ids, settings.lang).to_dict()
     except (OneNoteError, WriteDisabled) as e:
         raise ApiError(503, "ui.error.onenote", error=str(e))
 
@@ -408,7 +447,8 @@ def api_restore(body: dict) -> dict:
     if not settings.write_enabled:
         raise ApiError(403, "apply.disabled")
     try:
-        return restore(folder, writer_for(folder, settings.lang), settings, int(body.get("id", 0)), settings.lang)
+        with _writer(writer_for(folder, settings.lang)) as w:
+            return restore(folder, w, settings, int(body.get("id", 0)), settings.lang)
     except (OneNoteError, WriteDisabled, ValueError) as e:
         raise ApiError(409, "ui.error.restore", error=str(e))
 
@@ -445,7 +485,8 @@ def api_settings(body: dict) -> dict:
 
 
 GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_state, "/api/page": api_page,
-              "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied,
+              "/api/tree": api_tree, "/api/sections": api_sections, "/api/scan": api_scan, "/api/plan": api_plan,
+              "/api/applied": api_applied,
               "/api/diagnose": api_diagnose, "/api/job": api_job, "/api/log": api_log}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,

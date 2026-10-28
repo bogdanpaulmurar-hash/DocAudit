@@ -96,6 +96,8 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .pcol .body img { max-width: 100%; display: block; margin-top: 8px; border-radius: 6px; }
 .pcol .actions { display: flex; gap: 4px; flex-wrap: wrap; }
 .pcol .actions button { padding: 3px 8px; font-size: 12px; }
+.pcol .movebox { margin-top: 8px; padding: 8px; border: 1px solid var(--line, #ccc); border-radius: 6px; }
+.pcol .movebox select, .pcol .movebox input { width: 100%; box-sizing: border-box; }
 mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 2px; }
 mark.diff { background: var(--mark-strong); }
 

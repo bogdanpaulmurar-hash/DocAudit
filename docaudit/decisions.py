@@ -8,6 +8,7 @@ Acțiuni pe pagină (una curentă pe pagină, ultima câștigă):
     reference   pagina e versiunea bună
     mark_stale  de marcat ca învechită (în OneNote doar după „Aplică”)
     archive     de mutat în secțiunea „Arhivă” (doar după „Aplică”)
+    move        de mutat în altă secțiune, aleasă de utilizator (`target` = „notebook<TAB>secțiune”)
     keep        rămâne cum e
 Alte acțiuni (se adună, nu se înlocuiesc):
     ignore      constatarea nu e o problemă (cu cheia constatării)
@@ -25,10 +26,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DB_FILE = "decisions.db"
-PAGE_ACTIONS = ("reference", "mark_stale", "archive", "keep")
+PAGE_ACTIONS = ("reference", "mark_stale", "archive", "move", "keep")
 OTHER_ACTIONS = ("ignore", "not_in_group", "note")
 ACTIONS = PAGE_ACTIONS + OTHER_ACTIONS
-PENDING_ACTIONS = ("mark_stale", "archive")  # cele care vor scrie în OneNote în Etapa 7
+PENDING_ACTIONS = ("mark_stale", "archive", "move")  # cele care scriu în OneNote la „Aplică”
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS decisions (
@@ -75,6 +76,7 @@ class Decision:
     note: str
     undone_at: str | None
     applied_at: str | None
+    target: str = ""  # la „move”: „notebook<TAB>secțiune/subsecțiune”
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -96,6 +98,9 @@ class Journal:
         self.path = folder / DB_FILE
         with closing(self._connect()) as db, db:
             db.executescript(_SCHEMA)
+            cols = {r["name"] for r in db.execute("PRAGMA table_info(decisions)")}
+            if "target" not in cols:  # jurnale create înainte de 0.1.8
+                db.execute("ALTER TABLE decisions ADD COLUMN target TEXT NOT NULL DEFAULT ''")
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path)
@@ -103,16 +108,19 @@ class Journal:
         return db
 
     def add(self, page_id: str, action: str, group_id: str = "", finding: str = "", note: str = "",
-            user: str | None = None) -> Decision:
+            user: str | None = None, target: str = "") -> Decision:
         if action not in ACTIONS:
             raise ValueError(f"acțiune necunoscută: {action}")
         if action == "ignore" and not finding:
             raise ValueError("„ignore” are nevoie de cheia constatării")
+        if action == "move" and not split_target(target)[1]:
+            raise ValueError("„move” are nevoie de secțiunea în care se mută pagina")
         with closing(self._connect()) as db, db:
             cur = db.execute(
-                "INSERT INTO decisions (created_at, user, page_id, group_id, action, finding, note)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (_now(), user or _user(), page_id, group_id, action, finding, note))
+                "INSERT INTO decisions (created_at, user, page_id, group_id, action, finding, note, target)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (_now(), user or _user(), page_id, group_id, action, finding, note,
+                 target if action == "move" else ""))
             row = db.execute("SELECT * FROM decisions WHERE id = ?", (cur.lastrowid,)).fetchone()
         return Decision(**dict(row))
 
@@ -182,6 +190,16 @@ class Journal:
     def pending(self) -> list[Decision]:
         """Deciziile care, în Etapa 7, vor scrie în OneNote (arhivare, marcare), încă neaplicate."""
         return [d for d in self.current().values() if d.action in PENDING_ACTIONS and d.applied_at is None]
+
+
+def make_target(notebook: str, section: str) -> str:
+    return f"{notebook}\t{section}"
+
+
+def split_target(target: str) -> tuple[str, str]:
+    """„notebook<TAB>secțiune” → (notebook, secțiune); fără TAB: ("", "")."""
+    notebook, sep, section = (target or "").partition("\t")
+    return (notebook, section) if sep and section else ("", "")
 
 
 def finding_key(finding: dict) -> str:

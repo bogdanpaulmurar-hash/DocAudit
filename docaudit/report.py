@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from .compare.run import FINDINGS_FILE
-from .decisions import Journal, finding_key
+from .decisions import Journal, finding_key, split_target
 from .group.run import GROUPS_FILE
 from .i18n import t
 from .model import MANIFEST_FILE, read_pages
@@ -47,6 +47,7 @@ def build_state(folder: Path, lang: str | None = None) -> dict:
             "modified": p.modified if p else "",
             "decision": d.action if d else None,
             "decision_id": d.id if d else None,
+            "decision_target": " › ".join(x for x in split_target(d.target) if x) if d and d.action == "move" else "",
             "notes": [n.note for n in notes.get(pid, [])],
         }
 
