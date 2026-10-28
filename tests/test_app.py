@@ -297,6 +297,19 @@ def test_server_extract_demo(server, tmp_path):
     checks = _req(server, "GET", "/api/diagnose?demo=1")[1]["checks"]
     assert [c["ok"] for c in checks] == [True, True]
 
+    # ștergerea unei extrageri: doar cu confirmare, doar în folderul de date
+    assert _req(server, "POST", "/api/dataset/delete", {"ds": "doar-retea"})[0] == 400
+    assert _req(server, "POST", "/api/dataset/delete", {"ds": "../data", "confirm": True})[0] == 400
+    assert _req(server, "POST", "/api/dataset/delete", {"ds": "doar-retea", "confirm": True})[0] == 200
+    names = [d["name"] for d in _req(server, "GET", "/api/info")[1]["datasets"]]
+    assert "doar-retea" not in names and "demo" in names
+
+    # resetarea setărilor
+    assert _req(server, "POST", "/api/settings", {"write_enabled": True, "threshold": 0.8})[0] == 200
+    assert _req(server, "POST", "/api/settings/reset", {})[0] == 200
+    st = load_settings()
+    assert st.write_enabled is False and st.threshold == 0.6
+
 
 # ---------- iconița ----------
 

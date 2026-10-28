@@ -280,6 +280,27 @@ def api_restore(body: dict) -> dict:
         raise ApiError(409, "ui.error.restore", error=str(e))
 
 
+def api_delete_dataset(body: dict) -> dict:
+    """Șterge o extragere din folderul de date (doar local; OneNote nu e atins)."""
+    import shutil
+
+    if body.get("confirm") is not True:
+        raise ApiError(400, "ui.error.confirm")
+    folder = _dataset(body.get("ds"))
+    if folder.resolve().parent != data_dir().resolve():
+        raise ApiError(400, "ui.error.dataset")
+    shutil.rmtree(folder)
+    return {"deleted": folder.name}
+
+
+def api_reset_settings(body: dict) -> dict:
+    """Setările implicite (scrierea în OneNote oprită). Extragerile rămân."""
+    from ..settings import Settings, save_settings
+
+    save_settings(Settings())
+    return Settings().to_dict()
+
+
 def api_settings(body: dict) -> dict:
     try:
         return update_settings(body).to_dict()
@@ -292,8 +313,9 @@ GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_
               "/api/diagnose": api_diagnose}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,
-               "/api/settings": api_settings, "/api/link": api_link}
-WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore"}
+               "/api/settings": api_settings, "/api/link": api_link,
+               "/api/dataset/delete": api_delete_dataset, "/api/settings/reset": api_reset_settings}
+WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore", "/api/dataset/delete"}
 
 
 # ---------- serverul ----------
