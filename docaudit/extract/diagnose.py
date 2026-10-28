@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
 from .com import OneNoteError, OneNoteSource
-from .onenote_xml import parse_hierarchy
+from .onenote_xml import parse_hierarchy, parse_page
 
 
 @dataclass
@@ -72,7 +72,7 @@ def diagnose(make_source: Callable[[], OneNoteSource] | None = None,
             checks.append(Check("registry", ok, detail))
 
     if failed():
-        checks += [Check("com", None), Check("notebooks", None)]
+        checks += [Check("com", None), Check("notebooks", None), Check("pages", None)]
         return checks
     try:
         source = (make_source or _real_source)()
@@ -80,15 +80,33 @@ def diagnose(make_source: Callable[[], OneNoteSource] | None = None,
         tried = getattr(source, "_problems", None) or []
         checks.append(Check("com", True, how + (f" (înainte: {'; '.join(tried)})" if tried else "")))
     except OneNoteError as e:
-        checks += [Check("com", False, str(e)), Check("notebooks", None)]
+        checks += [Check("com", False, str(e)), Check("notebooks", None), Check("pages", None)]
         return checks
     try:
-        names = [nb.name for nb in parse_hierarchy(source.get_hierarchy_xml()).notebooks]
+        hierarchy = parse_hierarchy(source.get_hierarchy_xml())
+        names = [nb.name for nb in hierarchy.notebooks]
     except OneNoteError as e:
-        checks.append(Check("notebooks", False, str(e)))
+        checks += [Check("notebooks", False, str(e)), Check("pages", None)]
         return checks
     except Exception as e:  # XML neașteptat: îl arătăm, nu ascundem
-        checks.append(Check("notebooks", False, f"{type(e).__name__}: {e}"))
+        checks += [Check("notebooks", False, f"{type(e).__name__}: {e}"), Check("pages", None)]
         return checks
     checks.append(Check("notebooks", bool(names), f"{len(names)}: " + ", ".join(names) if names else "0"))
+    if not names:
+        checks.append(Check("pages", None))
+        return checks
+    # Citirea unei pagini: aici picau toate paginile când legătura dădea parametrii mutați.
+    pages = hierarchy.pages()
+    if not pages:
+        checks.append(Check("pages", False, "0 pagini în ierarhie"))
+        return checks
+    try:
+        page, _ = parse_page(source.get_page_xml(pages[0].id), pages[0].notebook, pages[0].section_path)
+        checks.append(Check("pages", True, f"{len(pages)} pagini; prima citită ({len(page.text)} caractere)"))
+    except Exception as e:
+        checks.append(Check("pages", False, f"{type(e).__name__}: {e}"))
+    from .. import log
+
+    log.get("diagnose").info("Verificare: %s", ", ".join(
+        f"{c.key}={'ok' if c.ok else 'nu' if c.ok is False else '-'}" for c in checks))
     return checks

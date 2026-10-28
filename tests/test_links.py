@@ -78,20 +78,29 @@ def test_diagnose_steps():
     from docaudit.extract.diagnose import diagnose
 
     ok = diagnose(DemoOneNote, windows_checks=False)
-    assert [c.key for c in ok] == ["com", "notebooks"] and all(c.ok for c in ok)
-    assert ok[-1].detail.startswith("3: ")
+    assert [c.key for c in ok] == ["com", "notebooks", "pages"] and all(c.ok for c in ok)
+    assert ok[1].detail.startswith("3: ") and ok[2].detail.startswith("80 pagini")
 
     def broken():
         raise OneNoteError("OneNote desktop nu răspunde prin COM")
 
     bad = diagnose(broken, windows_checks=False)
-    assert [(c.key, c.ok) for c in bad] == [("com", False), ("notebooks", None)] and "COM" in bad[0].detail
+    assert [(c.key, c.ok) for c in bad] == [("com", False), ("notebooks", None), ("pages", None)]
+    assert "COM" in bad[0].detail
 
     class Empty:
         def get_hierarchy_xml(self):
             return '<one:Notebooks xmlns:one="http://schemas.microsoft.com/office/onenote/2013/onenote"/>'
 
-    assert diagnose(Empty, windows_checks=False)[-1].ok is False
+    empty = diagnose(Empty, windows_checks=False)
+    assert [(c.key, c.ok) for c in empty][-2:] == [("notebooks", False), ("pages", None)]
+
+    class PagesFail(DemoOneNote):  # ierarhia merge, paginile nu (cazul cu 0 pagini extrase)
+        def get_page_xml(self, page_id):
+            raise OneNoteError("GetPageContent: 3 param.: com_error")
+
+    fail = diagnose(PagesFail, windows_checks=False)
+    assert fail[-1].key == "pages" and fail[-1].ok is False and "GetPageContent" in fail[-1].detail
 
 
 def test_diagnose_off_windows_and_cli(capsys, monkeypatch):

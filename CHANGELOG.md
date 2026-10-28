@@ -1,5 +1,16 @@
 # CHANGELOG — DocAudit
 
+## 0.1.4 — 2026-10-28
+- Reparat: extragerea dădea **0 pagini** fără explicație (raportat de Bogdan pe laptopul de lucru, notebook de 700+ pagini). Cauza: cu legătura din biblioteca de tipuri OneNote (varianta din 0.1.3), parametrul de ieșire al lui `GetPageContent` nu se dă deloc, iar a doua încercare trimitea parametrii mutați, deci fiecare pagină pica. Acum fiecare apel COM încearcă variantele de parametri în ordinea corectă și o ține minte pe cea care merge (`extract/connect.py`, `ComCaller`).
+- Reparat: „De aplicat” arăta `TypeError: IApplication.GetHierarchy() takes from 1 to 4 positional arguments but 5 were given`. Scrierea folosește aceeași legătură; la scrieri se încearcă altă variantă doar când numărul de parametri e greșit, ca o scriere să nu se repete.
+- Reparat: „Analiză” rămânea la „Analizez…” când apărea o eroare (de exemplu asemănarea după sens fără model). Eroarea rămâne acum în pagină; caseta „Asemănare după sens” e inactivă dacă modelul nu e instalat; o extragere cu 0 pagini nu mai poate fi analizată și spune de ce.
+- Nou: extragerea rulează **în fundal**, cu „Pagina N din M”, butonul „Oprește” și ultimele rânduri din log. Se salvează la fiecare 50 de pagini, deci o extragere oprită continuă de unde a rămas. Dacă primele 5 pagini pică toate, se oprește singură cu eroarea.
+- Nou: **logul tehnic** (Setări → Log tehnic): pornire, versiune, legătura cu OneNote, câte pagini și secțiuni, durate, erori cu locul din cod. Local în `data\logs\docaudit.log` și copie în `logs\pc-xxxxxx.log` din clona DocAudit din Google Drive, ca să-l pot citi de pe alt laptop (se oprește din Setări). Fără titluri, nume de notebook-uri sau text din pagini; căile din folderul utilizatorului devin `~`, numele de utilizator e ascuns.
+- „Verifică legătura cu OneNote” are un rând nou: **Citirea unei pagini** (cazul de mai sus se vedea doar așa).
+- Din „1. Updating Script” (scriptul vechi de export): preluate deocamdată logul pe pagină și oprirea clară la erori; restul (export PDF, duplicate exacte, documente pentru bot) e propus separat.
+- Teste: 131 trecute (`pytest -q`, Linux, Python 3.13), inclusiv variantele de apel COM (fără / cu loc pentru [out]), oprirea, salvarea pe parcurs și logul fără titluri.
+- Livrare: `git pull`, apoi din nou `Install.bat`. După primul scan, logul apare în `G:\My Drive\Dev\DocAudit\logs`.
+
 ## 0.1.3 — 2026-10-28
 - Nou: pașii „Cum fac?” sus pe fiecare ecran (Sursă, Analiză, Grupuri, De aplicat, Arhivă și jurnal, Setări), în RO / EN / DE. Sunt deschiși până îi închizi; browserul ține minte. Cerut de Bogdan: „nu am instrucțiuni”.
 - Nou: butonul „Verifică legătura cu OneNote” în Sursă (și în caseta de eroare). Verifică pe rând Windows, pywin32, OneNote desktop înregistrat, pornirea prin COM și notebook-urile deschise, cu ✓ / ✗ și ce e de făcut la primul ✗. Fără linie de comandă. Doar citire.

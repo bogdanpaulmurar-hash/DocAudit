@@ -34,17 +34,16 @@ def archive_pages() -> list[Page]:
 def create_test_notebook(folder: Path, name: str = "DocAudit Test") -> int:  # pragma: no cover - Windows
     import pythoncom  # type: ignore[import-not-found]
 
-    from .extract.connect import connect
+    from .extract.connect import ComCaller, connect
 
     if folder.exists():
         raise FileExistsError(f"{folder} există deja; alege un folder nou pentru notebook-ul de test")
     folder.parent.mkdir(parents=True, exist_ok=True)
     app, _how, _ = connect()
-    missing = pythoncom.Missing
+    call = ComCaller(app, pythoncom.Missing)
 
     def open_h(path: str, relative_to: str, kind: int) -> str:
-        result = app.OpenHierarchy(path, relative_to, missing, kind)
-        return result if isinstance(result, str) else result[0]
+        return call("OpenHierarchy", (path, relative_to), (kind,), write=True)
 
     nb_id = open_h(str(folder), "", CFT_NOTEBOOK)
     _, pages, images, _ = build_sample()
@@ -62,8 +61,7 @@ def create_test_notebook(folder: Path, name: str = "DocAudit Test") -> int:  # p
         key = (parent, sec_name)
         if key not in sections:
             sections[key] = open_h(f"{sec_name}.one", parent, CFT_SECTION)
-        result = app.CreateNewPage(sections[key], missing, 0)
-        page_id = result if isinstance(result, str) else result[0]
+        page_id = call("CreateNewPage", (sections[key],), (0,), write=True)
         app.UpdatePageContent(render_page_xml(page, imgs, page_id=page_id, for_update=True), 0, XS_2013)
         count += 1
     return count

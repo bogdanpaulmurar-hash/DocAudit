@@ -25,6 +25,8 @@ class Settings:
     exclude_sections: list[str] = field(default_factory=lambda: ["Arhivă"])
     write_enabled: bool = False  # mod doar citire până îl oprești tu
     port: int = 8765
+    share_log: bool = True  # copia logului tehnic (fără conținut) în folderul DocAudit din Google Drive
+    log_dir: str = ""  # gol = folderul `logs` din clona DocAudit
 
     def validate(self) -> list[str]:
         errors = []

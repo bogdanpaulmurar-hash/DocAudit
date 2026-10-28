@@ -94,21 +94,72 @@ def typelib_candidates() -> list[str]:  # pragma: no cover - doar pe Windows
     return out
 
 
+def arg_variants(before: tuple, after: tuple, missing: Any) -> list[tuple]:
+    """Felurile în care se poate da un apel COM cu un parametru [out] între `before` și `after`.
+
+    De ce: legarea dinamică vrea un loc pentru [out] (pythoncom.Missing), legarea din
+    biblioteca de tipuri (makepy, comtypes) nu îl vrea deloc, iar unele versiuni nu au
+    ultimii parametri opționali (schema XML). Cu locul pentru [out] dat greșit, OneNote
+    primea pagina cu parametrii mutați: toate paginile picau (extragere cu 0 pagini) sau
+    apelul ieșea cu „takes from 1 to 4 positional arguments but 5 were given”.
+    Ordinea: întâi apelurile complete, apoi cele fără parametrii opționali de la final.
+    """
+    out: list[tuple] = []
+    for k in range(len(after), -1, -1):
+        for v in ((*before, missing, *after[:k]), (*before, *after[:k])):
+            if v not in out:
+                out.append(v)
+    return out
+
+
+def _first_str(result: Any) -> Any:
+    if isinstance(result, tuple):  # unele legări întorc (rezultat, ieșiri...): XML-ul întâi
+        strings = [r for r in result if isinstance(r, str)]
+        return next((r for r in strings if r.lstrip().startswith("<")), strings[0] if strings else None)
+    return result
+
+
+class ComCaller:
+    """Apelează metode COM cu varianta de parametri care merge, ținută minte pe metodă.
+
+    `xml=True`: rezultatul trebuie să fie XML; altfel se încearcă varianta următoare.
+    `write=True`: se trece la varianta următoare doar la TypeError (număr greșit de
+    parametri, înainte ca apelul să ajungă la OneNote), ca o scriere să nu se repete.
+    """
+
+    def __init__(self, app: Any, missing: Any) -> None:
+        self.app, self.missing = app, missing
+        self._chosen: dict[str, int] = {}
+
+    def __call__(self, method: str, before: tuple, after: tuple = (), *, xml: bool = False,
+                 write: bool = False) -> Any:
+        variants = arg_variants(before, after, self.missing)
+        start = self._chosen.get(method)
+        order = ([start] if start is not None else []) + [i for i in range(len(variants)) if i != start]
+        fn = getattr(self.app, method)
+        errors: list[str] = []
+        for i in order:
+            try:
+                result = _first_str(fn(*variants[i]))
+            except TypeError as e:
+                errors.append(f"{len(variants[i])} param.: {e}")
+                continue
+            except Exception as e:
+                if write:
+                    raise
+                errors.append(f"{len(variants[i])} param.: {type(e).__name__}: {e}")
+                continue
+            if xml and not (isinstance(result, str) and result.lstrip().startswith("<")):
+                errors.append(f"{len(variants[i])} param.: răspuns neașteptat ({type(result).__name__})")
+                continue
+            self._chosen[method] = i
+            return result
+        raise RuntimeError(f"{method}: " + " | ".join(errors))
+
+
 def _verify(app: Any, missing: Any) -> None:  # pragma: no cover - doar pe Windows
     """O citire mică: dacă trece, varianta e bună."""
-    last: Exception | None = None
-    for args in (("", HS_NOTEBOOKS, missing, XS_2013), ("", HS_NOTEBOOKS)):
-        try:
-            result = getattr(app, "GetHierarchy")(*args)
-        except Exception as e:  # semnătura diferă între versiuni
-            last = e
-            continue
-        if isinstance(result, tuple):
-            result = next((r for r in result if isinstance(r, str)), None)
-        if isinstance(result, str) and result.lstrip().startswith("<"):
-            return
-        last = RuntimeError(f"răspuns neașteptat: {type(result).__name__}")
-    raise last or RuntimeError("GetHierarchy nu a răspuns")
+    ComCaller(app, missing)("GetHierarchy", ("", HS_NOTEBOOKS), (XS_2013,), xml=True)
 
 
 def _pywin32_from_file(path: str) -> Any:  # pragma: no cover - doar pe Windows

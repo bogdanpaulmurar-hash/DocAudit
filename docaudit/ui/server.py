@@ -22,7 +22,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .. import __version__
+from .. import __version__, log
 from ..i18n import LANGUAGES, _load
 from ..model import PAGES_FILE, image_path, read_manifest, read_pages
 from ..paths import data_dir, datasets
@@ -30,6 +30,7 @@ from ..safety import is_loopback
 from ..settings import load_settings, update_settings
 
 _write_lock = threading.Lock()  # o singură analiză / extragere / aplicare odată
+_lg = log.get("ui")
 
 
 class ApiError(Exception):
@@ -71,8 +72,11 @@ def api_info(q: dict) -> dict:
                           "compared": (folder / "findings.json").is_file()})
         except Exception:
             continue
+    import importlib.util
+
     return {"version": __version__, "languages": list(LANGUAGES), "settings": load_settings().to_dict(),
-            "datasets": items, "profiles": list_profiles(data_dir() / "profiles"), "data_dir": str(data_dir())}
+            "semantic_available": importlib.util.find_spec("sentence_transformers") is not None,
+            "log": log.info(), "datasets": items, "profiles": list_profiles(data_dir() / "profiles"), "data_dir": str(data_dir())}
 
 
 def api_texts(q: dict) -> dict:
@@ -146,7 +150,74 @@ def api_link(body: dict) -> dict:
             "page": info.page, "open_url": info.open_url}
 
 
+class Job:
+    """O extragere care rulează în fundal: notebook-urile mari (sute de pagini) durează minute."""
+
+    def __init__(self, kind: str) -> None:
+        self.id = secrets.token_hex(6)
+        self.kind = kind
+        self.state = "running"  # running | done | error
+        self.done = 0
+        self.total = 0
+        self.result: dict | None = None
+        self.error: dict | None = None
+        self.cancel = threading.Event()
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "kind": self.kind, "state": self.state, "done": self.done, "total": self.total,
+                "result": self.result, "error": self.error, "log": log.tail(12)}
+
+
+_jobs: dict[str, Job] = {}
+
+
+def _start_job(kind: str, work) -> Job:
+    """Pornește `work(job)` într-un fir separat, dacă nu rulează deja altă scriere."""
+    if not _write_lock.acquire(blocking=False):
+        raise ApiError(409, "ui.error.busy")
+    job = Job(kind)
+    _jobs[job.id] = job
+
+    def run() -> None:
+        try:
+            job.result = work(job)
+            job.state = "done"
+        except ApiError as e:
+            job.error = {"error": e.key, "params": {k: str(v) for k, v in e.params.items()}}
+            job.state = "error"
+            _lg.error("%s: %s %s", kind, e.key, log.describe_error(e) if e.params else "")
+        except Exception as e:  # o eroare neprevăzută: în log cu locul din cod
+            job.error = {"error": "ui.error.internal", "params": {"error": f"{type(e).__name__}: {e}"}}
+            job.state = "error"
+            _lg.exception("%s a picat: %s", kind, log.describe_error(e))
+        finally:
+            _write_lock.release()
+
+    threading.Thread(target=run, daemon=True, name=f"docaudit-{kind}").start()
+    return job
+
+
+def api_job(q: dict) -> dict:
+    job = _jobs.get(q.get("id") or "")
+    if job is None:
+        raise ApiError(404, "ui.error.notfound")
+    return job.to_dict()
+
+
+def api_job_cancel(body: dict) -> dict:
+    job = _jobs.get(str(body.get("id") or ""))
+    if job is None:
+        raise ApiError(404, "ui.error.notfound")
+    job.cancel.set()
+    return job.to_dict()
+
+
+def api_log(q: dict) -> dict:
+    return {**log.info(), "lines": log.tail(300)}
+
+
 def api_extract(body: dict) -> dict:
+    """Pornește extragerea în fundal; progresul se citește din /api/job."""
     from ..extract.com import OneNoteError
     from ..extract.run import extract_to_dataset
     from ..extract.selection import Selection, save_profile
@@ -159,21 +230,40 @@ def api_extract(body: dict) -> dict:
                     pages=body.get("pages") or [], exclude_sections=body.get("exclude", settings.exclude_sections))
     if body.get("profile"):
         save_profile(data_dir() / "profiles", body["profile"], sel)
-    try:
-        if body.get("demo"):
-            from ..extract.demo import DemoOneNote
 
-            source, label = DemoOneNote(), "demo (eșantion fictiv)"
-        else:  # pragma: no cover - Windows
-            from ..extract.com import ReadOnlyOneNote
+    def work(job: Job) -> dict:
+        def progress(n: int, total: int, _title: str) -> None:
+            job.done, job.total = n, total
 
-            source, label = ReadOnlyOneNote(), "OneNote desktop (COM)"
-        report = extract_to_dataset(source, sel, data_dir() / name, incremental=not body.get("full"),
-                                    source_label=label)
-    except OneNoteError as e:
-        raise ApiError(503, "ui.error.onenote", error=str(e))
-    return {"name": name, "total": report.total, "fetched": report.fetched, "reused": report.reused,
-            "skipped": report.skipped, "removed": report.removed, "errors": report.errors}
+        try:
+            if body.get("demo"):
+                from ..extract.demo import DemoOneNote
+
+                source, label = DemoOneNote(), "demo (eșantion fictiv)"
+            else:  # pragma: no cover - Windows
+                from ..extract.com import ReadOnlyOneNote
+
+                source, label = ReadOnlyOneNote(), "OneNote desktop (COM)"
+            report = extract_to_dataset(source, sel, data_dir() / name, incremental=not body.get("full"),
+                                        source_label=label, progress=progress, cancel=job.cancel.is_set)
+        except OneNoteError as e:
+            raise ApiError(503, "ui.error.onenote", error=str(e))
+        if report.aborted:
+            raise ApiError(502, "ui.error.extract.aborted", error=report.aborted)
+        return {"name": name, "total": report.total, "fetched": report.fetched, "reused": report.reused,
+                "skipped": report.skipped, "removed": report.removed, "errors": report.errors[:50],
+                "error_count": len(report.errors), "cancelled": report.cancelled,
+                "seconds": round(report.seconds)}
+
+    job = _start_job("extract", work)
+    if body.get("wait"):  # linia de comandă și testele: așteaptă rezultatul
+        while job.state == "running":
+            threading.Event().wait(0.05)
+        if job.error:
+            raise ApiError(400 if job.error["error"] == "ui.error.name" else 503, job.error["error"],
+                           **job.error["params"])
+        return job.result or {}
+    return {"job": job.id}
 
 
 def api_analyze(body: dict) -> dict:
@@ -181,16 +271,26 @@ def api_analyze(body: dict) -> dict:
     from ..group.run import run_grouping
     from ..group.semantic import SemanticUnavailable
 
+    import time
+
     folder = _dataset(body.get("ds"))
     settings = load_settings()
     threshold = float(body.get("threshold", settings.threshold))
     if not 0 < threshold < 1:
         raise ApiError(400, "ui.error.threshold")
+    if read_manifest(folder).page_count == 0:
+        raise ApiError(400, "ui.error.nopages")
+    semantic = bool(body.get("semantic", settings.semantic))
+    t0 = time.monotonic()
     try:
-        groups = run_grouping(folder, threshold, use_semantic=bool(body.get("semantic", settings.semantic)))
+        groups = run_grouping(folder, threshold, use_semantic=semantic)
     except SemanticUnavailable as e:
         raise ApiError(503, "ui.error.semantic", error=str(e))
+    t1 = time.monotonic()
     result = run_compare(folder)
+    _lg.info("Analiză: %d grupuri, %d pagini negrupate, %d constatări (prag %.2f, sens %s; grupare %.1f s, "
+             "comparare %.1f s)", len(groups.groups), len(groups.ungrouped), len(result.findings()), threshold,
+             "da" if semantic else "nu", t1 - t0, time.monotonic() - t1)
     return {"groups": len(groups.groups), "ungrouped": len(groups.ungrouped), "findings": len(result.findings())}
 
 
@@ -303,19 +403,23 @@ def api_reset_settings(body: dict) -> dict:
 
 def api_settings(body: dict) -> dict:
     try:
-        return update_settings(body).to_dict()
+        result = update_settings(body).to_dict()
     except (TypeError, ValueError) as e:
         raise ApiError(400, "ui.error.settings", error=str(e))
+    if {"share_log", "log_dir"} & set(body):
+        log.setup(force=True)
+    return result
 
 
 GET_ROUTES = {"/api/info": api_info, "/api/texts": api_texts, "/api/state": api_state, "/api/page": api_page,
               "/api/tree": api_tree, "/api/scan": api_scan, "/api/plan": api_plan, "/api/applied": api_applied,
-              "/api/diagnose": api_diagnose}
+              "/api/diagnose": api_diagnose, "/api/job": api_job, "/api/log": api_log}
 POST_ROUTES = {"/api/extract": api_extract, "/api/analyze": api_analyze, "/api/decision": api_decision,
                "/api/undo": api_undo, "/api/apply": api_apply, "/api/restore": api_restore,
                "/api/settings": api_settings, "/api/link": api_link,
-               "/api/dataset/delete": api_delete_dataset, "/api/settings/reset": api_reset_settings}
-WRITE_ROUTES = {"/api/extract", "/api/analyze", "/api/apply", "/api/restore", "/api/dataset/delete"}
+               "/api/dataset/delete": api_delete_dataset, "/api/settings/reset": api_reset_settings,
+               "/api/job/cancel": api_job_cancel}
+WRITE_ROUTES = {"/api/analyze", "/api/apply", "/api/restore", "/api/dataset/delete"}
 
 
 # ---------- serverul ----------
@@ -419,8 +523,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self._json(200, fn(arg))
         except ApiError as e:
+            if e.status >= 500 or e.key == "ui.error.onenote":
+                _lg.warning("%s: %s %s", getattr(fn, "__name__", "api"), e.key,
+                            "; ".join(f"{k}={v}" for k, v in e.params.items())[:800])
             self._json(e.status, {"error": e.key, "params": {k: str(v) for k, v in e.params.items()}})
         except Exception as e:  # o eroare neprevăzută nu oprește serverul
+            _lg.exception("%s a picat: %s", getattr(fn, "__name__", "api"), log.describe_error(e))
             self._json(500, {"error": "ui.error.internal", "params": {"error": f"{type(e).__name__}: {e}"}})
 
     def _image(self, q: dict) -> None:
@@ -483,6 +591,7 @@ class DocAuditServer(ThreadingHTTPServer):
 
 
 def make_server(port: int = 8765, host: str = "127.0.0.1") -> DocAuditServer:
+    log.setup()
     try:
         return DocAuditServer(host, port)
     except OSError:

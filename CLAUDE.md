@@ -24,6 +24,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - Raport: `python -m docaudit report DIR [--format html|csv|md]`
 - Aplicare în OneNote: `python -m docaudit apply DIR` (previzualizare) · `--yes` (scrie, doar cu scrierea pornită în setări) · `restore DIR NUMĂR`
 - Iconiță: `python -m docaudit make-icon FOLDER` (o folosește `Install.bat` pentru scurtături)
+- Log: în UI Setări → Log tehnic; fișierele `%LOCALAPPDATA%\DocAudit\data\logs\docaudit.log` și `<clona>\logs\pc-xxxxxx.log` (`DOCAUDIT_LOG_SHARE=0` oprește copia; testele o opresc)
 
 ## Hartă
 - `docs/PLAN.md` — arhitectura, formatul de intrare, etapele, testul pe eșantion
@@ -40,7 +41,9 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 - `docaudit/settings.py` — setările în `data_dir()/settings.json`; `write_enabled` e `False` implicit (mod doar citire)
 - `docaudit/extract/onenote_xml.py` — XML OneNote 2013 (ierarhie, pagină) → Page; `render_*` pentru teste și notebook-ul de test
 - `docaudit/extract/connect.py` — legătura COM cu mai multe încercări (biblioteca înregistrată, din ONENOTE.EXE, comtypes, dinamic), folosită de citire, scriere și notebook-ul de test
+- `docaudit/extract/connect.py` — legătura COM (mai multe variante) și `ComCaller`: încearcă parametrii cu / fără loc pentru [out] și ține minte varianta bună
 - `docaudit/extract/com.py` — `ReadOnlyOneNote`: doar GetHierarchy și GetPageContent
+- `docaudit/log.py` — logul tehnic: local `data_dir()/logs/docaudit.log`, copie în `<clona>/logs/pc-xxxxxx.log` (Drive), ultimele rânduri în memorie pentru UI
 - `docaudit/extract/run.py` — extragere cu selecție, incremental după data modificării, cache de imagini
 - `docaudit/extract/selection.py` — bife (notebook / secțiune / pagină), excluderi („Arhivă”), profiluri
 - `docaudit/extract/files.py` — import .mht / .docx (alternativa fără COM)
@@ -67,6 +70,7 @@ Verificator local de documentație exportată din OneNote: extrage paginile din 
 
 ## Reguli ale proiectului
 - **Nimic nu pleacă de pe calculator**: procesarea rulează local; fără apeluri de rețea în timpul analizei (test automat cu socket blocat). Serverul UI ascultă doar pe 127.0.0.1. Modelele (embeddings, OCR, LLM local) sunt opționale, descărcate o singură dată, rulate offline.
+- **Logul tehnic** e singurul lucru care ajunge în Drive (copie în `logs/` din clonă, cerut de Bogdan ca să-l pot citi; se oprește din Setări). În log doar numere, durate, tipuri de eroare și locul din cod: niciodată titluri, nume de notebook-uri / secțiuni, id-uri sau text din pagini (test automat). Claude citește logul din Drive (`G:\My Drive\Dev\DocAudit\logs`) după un scan.
 - **Nimic nu se șterge sau rescrie automat**: analiza e doar citire. Orice scriere în OneNote (arhivare, marcare) se face doar după decizia explicită a utilizatorului, cu previzualizare (dry-run) și copie de siguranță a paginii înainte.
 - **Arhivare = mutare, nu ștergere**: pagina ajunge în secțiunea „Arhivă” (nume configurabil) cu o notă „Mutat din: <secțiune>, <dată>, <motiv>”; se poate restaura.
 - **Date reale niciodată în repo**: `data/`, `exports/`, `*.db` sunt în `.gitignore`; testele folosesc doar eșantionul fictiv.
