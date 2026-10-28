@@ -182,6 +182,8 @@ def extract_to_dataset(
     if not report.cancelled:
         remove_orphan_images(out, pages)
     report.seconds = time.monotonic() - started
+    if getattr(source, "without_images", 0):
+        lg.warning("%d pagini citite fără imagini (OneNote cădea când le cerea cu imaginile)", source.without_images)
     lg.info("Extragere gata în %.0f s: %d pagini (citite %d, refolosite %d, sărite %d, dispărute %d, erori %d)",
             report.seconds, report.total, report.fetched, report.reused, report.skipped, report.removed,
             len(report.errors))

@@ -112,6 +112,31 @@ def arg_variants(before: tuple, after: tuple, missing: Any) -> list[tuple]:
     return out
 
 
+# OneNote s-a închis / s-a blocat sau e ocupat: nu are rost să încercăm alte variante de parametri.
+RPC_GONE = {-2147023174: "0x800706BA RPC server unavailable", -2147023170: "0x800706BE RPC call failed",
+            -2147417848: "0x80010108 RPC disconnected", -2147023169: "0x800706BF RPC call failed DNE"}
+RPC_BUSY = {-2147418111: "0x80010001 call rejected (busy)", -2147417846: "0x8001010A server busy"}
+
+
+def hresult(e: BaseException) -> int | None:
+    """Codul COM al unei erori (pywin32 com_error sau comtypes COMError)."""
+    code = getattr(e, "hresult", None)
+    if code is None and e.args and isinstance(e.args[0], int):
+        code = e.args[0]
+    if isinstance(code, int) and code > 0x7FFFFFFF:
+        code -= 1 << 32
+    return code if isinstance(code, int) else None
+
+
+class OneNoteGone(RuntimeError):
+    """OneNote nu mai răspunde (proces închis / blocat) sau e ocupat; `busy` spune care."""
+
+    def __init__(self, method: str, code: int, busy: bool) -> None:
+        name = (RPC_BUSY if busy else RPC_GONE).get(code, hex(code & 0xFFFFFFFF))
+        super().__init__(f"{method}: OneNote nu răspunde ({name})")
+        self.code, self.busy = code, busy
+
+
 def _first_str(result: Any) -> Any:
     if isinstance(result, tuple):  # unele legări întorc (rezultat, ieșiri...): XML-ul întâi
         strings = [r for r in result if isinstance(r, str)]
@@ -145,6 +170,9 @@ class ComCaller:
                 errors.append(f"{len(variants[i])} param.: {e}")
                 continue
             except Exception as e:
+                code = hresult(e)
+                if code in RPC_GONE or code in RPC_BUSY:
+                    raise OneNoteGone(method, code, code in RPC_BUSY) from e
                 if write:
                     raise
                 errors.append(f"{len(variants[i])} param.: {type(e).__name__}: {e}")

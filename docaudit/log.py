@@ -17,7 +17,6 @@ import collections
 import getpass
 import hashlib
 import logging
-import logging.handlers
 import os
 import platform
 import socket
@@ -110,13 +109,42 @@ class _MemoryHandler(logging.Handler):
             _memory.extend(line.splitlines() or [""])
 
 
+class _AppendHandler(logging.Handler):
+    """Deschide fișierul, scrie rândul și îl închide imediat.
+
+    De ce: Google Drive nu urcă un fișier ținut deschis, iar DocAudit stă pornit ore
+    întregi; cu fișierul ținut deschis, copia din Drive rămânea la pornire. Așa și două
+    procese DocAudit (tray + o comandă) pot scrie în același fișier pe Windows.
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__()
+        self.path = path
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            line = self.format(record) + "\n"
+            with _lock_files:
+                try:
+                    if self.path.stat().st_size > _MAX_BYTES:  # păstrăm o singură arhivă: .1
+                        os.replace(self.path, self.path.with_suffix(self.path.suffix + ".1"))
+                except OSError:
+                    pass
+                with open(self.path, "a", encoding="utf-8", newline="\r\n" if os.name == "nt" else "\n") as f:
+                    f.write(line)
+        except Exception:
+            self.handleError(record)
+
+
+_lock_files = threading.Lock()
+
+
 def _file_handler(path: Path) -> logging.Handler | None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        h = logging.handlers.RotatingFileHandler(path, maxBytes=_MAX_BYTES, backupCount=3, encoding="utf-8",
-                                                 delay=True)
     except OSError:
         return None
+    h = _AppendHandler(path)
     h.setFormatter(logging.Formatter(FORMAT))
     return h
 

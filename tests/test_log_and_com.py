@@ -137,3 +137,61 @@ def test_log_never_has_page_titles(tmp_path, monkeypatch):
         log.setup(share=False, custom_dir="", force=True)
         for h in logging.getLogger("docaudit").handlers:
             h.close()
+
+
+class FakeComError(Exception):
+    """Ca pywin32 com_error: primul argument e codul COM."""
+
+
+class CrashingOneNote:
+    """GetPageContent: prima dată „RPC server unavailable” (OneNote a căzut), apoi merge."""
+
+    def __init__(self, crashes: int, crash_with_images_only: bool = False) -> None:
+        self.crashes, self.with_images_only = crashes, crash_with_images_only
+        self.calls = []
+
+    def GetPageContent(self, page_id, info=0, schema=2):
+        self.calls.append(info)
+        if self.crashes and (not self.with_images_only or info == 1):
+            self.crashes -= 1
+            raise FakeComError(-2147023174, "The RPC server is unavailable.", None, None)
+        return f"<page info='{info}'/>"
+
+
+def test_com_caller_stops_on_rpc_error():
+    from docaudit.extract.connect import OneNoteGone
+
+    app = CrashingOneNote(crashes=1)
+    with pytest.raises(OneNoteGone, match="0x800706BA"):
+        ComCaller(app, MISSING)("GetPageContent", ("p",), (1, 2), xml=True)
+    assert len(app.calls) == 1  # nu mai încearcă celelalte 5 variante pe un OneNote căzut
+
+
+def _readonly(app, monkeypatch):
+    from docaudit.extract import com
+
+    monkeypatch.setattr(com, "PAUSE", 0)
+    monkeypatch.setattr(com.time, "sleep", lambda s: None)
+    ro = com.ReadOnlyOneNote.__new__(com.ReadOnlyOneNote)
+    ro._missing, ro.without_images, ro._how = MISSING, 0, "test"
+    ro.reconnects = 0
+
+    def reconnect():
+        ro.reconnects += 1
+        ro._call = ComCaller(app, MISSING)
+
+    ro._call = ComCaller(app, MISSING)
+    ro._connect = reconnect
+    return ro
+
+
+def test_readonly_reconnects_after_onenote_crash(monkeypatch):
+    app = CrashingOneNote(crashes=1)
+    ro = _readonly(app, monkeypatch)
+    assert ro.get_page_xml("p") == "<page info='1'/>" and ro.reconnects == 1 and ro.without_images == 0
+
+
+def test_readonly_falls_back_to_page_without_images(monkeypatch):
+    app = CrashingOneNote(crashes=5, crash_with_images_only=True)
+    ro = _readonly(app, monkeypatch)
+    assert ro.get_page_xml("p") == "<page info='0'/>" and ro.without_images == 1
