@@ -10,7 +10,6 @@
   - tabelele fără linii verticale, cu antet mic; „Setări” e un formular pe două coloane, cu comutatoare în loc de bife;
   - arborele OneNote are săgeți și linii de ghidaj; bara de progres și mesajele de jos (toast) au formă nouă.
 - Tehnic: doar `ui/static/app.css` și `index.html`; în `app.js` butoanele din meniu primesc `data-tab` (pentru iconițe). Iconițele sunt SVG în CSS, fără fișiere sau resurse noi.
-- Reparat: banda „Scrierea în OneNote e pornită” nu mai poate apărea când scrierea e oprită (atributul `hidden` e respectat de CSS).
 - Teste: 163 trecute (`pytest -q`, Linux); verificat în Chromium pe toate ecranele, temă deschisă și întunecată, la 1440 / 1000 / 420 px.
 - Livrare: `git pull`, apoi `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
 
