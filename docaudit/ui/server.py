@@ -353,7 +353,7 @@ def api_decision(body: dict) -> dict:
     try:
         d = Journal(folder).add(body["page"], action, group_id=body.get("group", ""),
                                 finding=body.get("finding", ""), note=(body.get("note") or "")[:2000],
-                                target=str(body.get("target") or "")[:1000])
+                                target=str(body.get("target") or "")[:5000])
     except ValueError:
         raise ApiError(400, "ui.error.action")
     if action == "not_in_group":

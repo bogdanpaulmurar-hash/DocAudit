@@ -6,6 +6,9 @@ Reguli (din CLAUDE.md):
 - înainte de orice scriere, XML-ul complet al paginii se salvează în copii de siguranță;
 - arhivare = copie în secțiunea „Arhivă” cu nota „Mutat din …” + originalul în Coșul OneNote;
 - mutare în altă secțiune (aleasă de utilizator) = la fel, doar că ținta e secțiunea aleasă;
+- titlu nou / text adăugat = doar titlul sau un bloc de text din pagină; restaurarea pune titlul
+  vechi înapoi, respectiv scoate doar paragrafele adăugate;
+- ordinea pe aceeași pagină: întâi titlul și textul, apoi prefixul „[ÎNVECHIT]”, la urmă mutarea;
 - o pagină modificată în OneNote după extragere nu se atinge (se cere o extragere nouă).
 """
 
@@ -17,14 +20,15 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..decisions import Journal, split_target
+from ..decisions import Journal, split_target, split_text_target
 from ..extract.onenote_xml import parse_hierarchy
 from ..i18n import t
 from ..model import read_pages
 from ..paths import backups_dir
 from ..settings import Settings
 from .writer import WritableOneNote
-from .xmlops import copy_page_xml, has_prefix, prefixed_title, title_html_of, title_update_xml
+from .xmlops import (add_text_xml, added_paragraph_ids, copy_page_xml, has_prefix, plain_title_html, prefixed_title,
+                     title_html_of, title_update_xml)
 
 
 class WriteDisabled(RuntimeError):
@@ -39,10 +43,10 @@ class PlanItem:
     title: str
     notebook: str
     section: str
-    target: str  # secțiunea de arhivă, secțiunea aleasă la mutare sau noul titlu
+    target: str  # secțiunea de arhivă, secțiunea aleasă la mutare, noul titlu sau textul adăugat
     status: str  # ready | skip
     reason: str = ""  # cheie: missing, changed, already_archived, already_marked, create_section,
-    #                   already_there, no_target
+    #                   already_there, no_target, same_title
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -92,13 +96,19 @@ def _section_by_path(writer: WritableOneNote, notebook: str, path: str) -> str |
     return None
 
 
+_ORDER = {"rename": 0, "add_text": 1, "mark_stale": 2}  # restul (mutările) la urmă
+
+
 def plan(folder: Path, writer: WritableOneNote, settings: Settings) -> list[PlanItem]:
     """Ce s-ar întâmpla la „Aplică”. Doar citește din OneNote."""
     journal = Journal(folder)
     pages = {p.id: p for p in read_pages(folder)}
     where = _locate(writer)
+    ours = journal.own_modified()  # pagini schimbate de „Aplică” după extragere: nu sunt „modificate de altcineva”
+    pending = journal.pending()
+    renamed = {d.page_id: d.target for d in pending if d.action == "rename"}
     items = []
-    for d in sorted(journal.pending(), key=lambda d: d.id):
+    for d in sorted(pending, key=lambda d: (_ORDER.get(d.action, 3), d.id)):
         page = pages.get(d.page_id)
         loc = where.get(d.page_id)
         title = page.title if page else d.page_id
@@ -107,8 +117,16 @@ def plan(folder: Path, writer: WritableOneNote, settings: Settings) -> list[Plan
             continue
         base = dict(decision_id=d.id, action=d.action, page_id=d.page_id, title=loc["title"] or title,
                     notebook=loc["notebook"], section=loc["section"])
-        if page is not None and page.modified != loc["modified"]:
+        if page is not None and page.modified != loc["modified"] and ours.get(d.page_id) != loc["modified"]:
             items.append(PlanItem(**base, target="", status="skip", reason="changed"))
+        elif d.action == "rename":
+            if d.target == loc["title"]:
+                items.append(PlanItem(**base, target=d.target, status="skip", reason="same_title"))
+            else:
+                items.append(PlanItem(**base, target=d.target, status="ready"))
+        elif d.action == "add_text":
+            at, text = split_text_target(d.target)
+            items.append(PlanItem(**base, target=text, status="ready", reason="at_" + at))
         elif d.action == "move":
             nb_name, sec_path = split_target(d.target)
             shown = f"{nb_name} › {sec_path}" if nb_name != loc["notebook"] else sec_path
@@ -127,10 +145,11 @@ def plan(folder: Path, writer: WritableOneNote, settings: Settings) -> list[Plan
                 items.append(PlanItem(**base, target=settings.archive_section, status="ready",
                                       reason="" if exists else "create_section"))
         else:
-            if loc["title"].startswith(settings.stale_prefix.strip()):
-                items.append(PlanItem(**base, target=loc["title"], status="skip", reason="already_marked"))
+            title_now = renamed.get(d.page_id, loc["title"])
+            if title_now.startswith(settings.stale_prefix.strip()):
+                items.append(PlanItem(**base, target=title_now, status="skip", reason="already_marked"))
             else:
-                items.append(PlanItem(**base, target=settings.stale_prefix + loc["title"], status="ready"))
+                items.append(PlanItem(**base, target=settings.stale_prefix + title_now, status="ready"))
     return items
 
 
@@ -187,6 +206,19 @@ def apply(folder: Path, writer: WritableOneNote, settings: Settings, decision_id
                 journal.record_applied(d.id, item.action, item.page_id, item.title, notebook_id=loc["notebook_id"],
                                        section_id=loc["section_id"], section=item.section, new_page_id=new_id,
                                        backup=str(backup))
+            elif item.action == "rename":
+                partial, old = title_update_xml(xml, plain_title_html(d.target))
+                writer.update_page(partial)
+                journal.record_applied(d.id, "rename", item.page_id, item.title, notebook_id=loc["notebook_id"],
+                                       section_id=loc["section_id"], section=item.section, old_title_html=old,
+                                       backup=str(backup), after_modified=_modified_now(writer, item.page_id))
+            elif item.action == "add_text":
+                at, text = split_text_target(d.target)
+                writer.update_page(add_text_xml(xml, text, at))
+                added = added_paragraph_ids(xml, writer.get_page_xml(item.page_id), text)
+                journal.record_applied(d.id, "add_text", item.page_id, item.title, notebook_id=loc["notebook_id"],
+                                       section_id=loc["section_id"], section=item.section, added_ids=",".join(added),
+                                       backup=str(backup), after_modified=_modified_now(writer, item.page_id))
             else:
                 old = title_html_of(xml)
                 if has_prefix(old, settings.stale_prefix):
@@ -196,16 +228,21 @@ def apply(folder: Path, writer: WritableOneNote, settings: Settings, decision_id
                 writer.update_page(partial)
                 journal.record_applied(d.id, "mark_stale", item.page_id, item.title, notebook_id=loc["notebook_id"],
                                        section_id=loc["section_id"], section=item.section, old_title_html=old,
-                                       backup=str(backup))
+                                       backup=str(backup), after_modified=_modified_now(writer, item.page_id))
             result.done.append(item.to_dict())
         except Exception as e:  # o pagină care nu merge nu le oprește pe celelalte
             result.errors.append({**item.to_dict(), "error": str(e)})
     return result
 
 
+def _modified_now(writer: WritableOneNote, page_id: str) -> str:
+    return _locate(writer).get(page_id, {}).get("modified", "")
+
+
 def restore(folder: Path, writer: WritableOneNote, settings: Settings, applied_id: int,
             lang: str | None = None) -> dict:
-    """Întoarce o pagină arhivată / mutată în secțiunea ei sau scoate prefixul „[ÎNVECHIT]”."""
+    """Întoarce o pagină arhivată / mutată în secțiunea ei, pune titlul vechi înapoi (după „[ÎNVECHIT]”
+    sau titlu nou) ori scoate paragrafele adăugate."""
     if not settings.write_enabled:
         raise WriteDisabled(t("apply.disabled", lang))
     journal = Journal(folder)
@@ -224,13 +261,23 @@ def restore(folder: Path, writer: WritableOneNote, settings: Settings, applied_i
         writer.update_page(copy_page_xml(xml, new_id))
         writer.delete_page(row["new_page_id"])
         out = {"page_id": new_id, "section": row["section"]}
+    elif row["action"] == "add_text":
+        if row["page_id"] not in where:
+            raise ValueError(t("apply.restore.missing", lang))
+        ids = [i for i in (row.get("added_ids") or "").split(",") if i]
+        if not ids:
+            raise ValueError(t("apply.restore.notext", lang))
+        for oid in ids:
+            writer.delete_content(row["page_id"], oid)
+        out = {"page_id": row["page_id"], "section": row["section"]}
     else:
         if row["page_id"] not in where:
             raise ValueError(t("apply.restore.missing", lang))
         partial, _ = title_update_xml(writer.get_page_xml(row["page_id"]), row["old_title_html"])
         writer.update_page(partial)
         out = {"page_id": row["page_id"], "section": row["section"]}
-    journal.mark_restored(applied_id, row["decision_id"])
+    journal.mark_restored(applied_id, row["decision_id"],
+                          _modified_now(writer, row["page_id"]) if row["action"] not in ("archive", "move") else "")
     return out
 
 

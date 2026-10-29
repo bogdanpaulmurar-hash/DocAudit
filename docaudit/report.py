@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from .compare.run import FINDINGS_FILE
-from .decisions import Journal, finding_key, split_target
+from .decisions import Journal, finding_key, split_target, split_text_target
 from .group.run import GROUPS_FILE
 from .i18n import t
 from .model import MANIFEST_FILE, read_pages
@@ -35,6 +35,7 @@ def build_state(folder: Path, lang: str | None = None) -> dict:
     current = journal.current()
     ignored = journal.ignored_findings()
     notes = journal.notes()
+    edits = journal.edits()
 
     def page_info(pid: str) -> dict:
         p = pages.get(pid)
@@ -49,6 +50,7 @@ def build_state(folder: Path, lang: str | None = None) -> dict:
             "decision_id": d.id if d else None,
             "decision_target": " › ".join(x for x in split_target(d.target) if x) if d and d.action == "move" else "",
             "notes": [n.note for n in notes.get(pid, [])],
+            **_edits_info(edits.get(pid)),
         }
 
     titles = {pid: p.title for pid, p in pages.items()}
@@ -91,6 +93,17 @@ def build_state(folder: Path, lang: str | None = None) -> dict:
                                    "section": page_info(d.page_id)["section"]} for d in journal.pending()],
         "history": [d.to_dict() for d in journal.history()],
     }
+
+
+def _edits_info(e: dict | None) -> dict:
+    """Titlul nou și textele de adăugat ale unei pagini, pentru interfață."""
+    r = e["rename"] if e else None
+    texts = []
+    for d in (e["add_text"] if e else []):
+        at, text = split_text_target(d.target)
+        texts.append({"id": d.id, "at": at, "text": text, "applied": d.applied_at is not None})
+    return {"rename": {"id": r.id, "title": r.target, "applied": r.applied_at is not None} if r else None,
+            "added_texts": texts}
 
 
 def describe(f: dict, titles: dict[str, str], lang: str | None = None) -> str:

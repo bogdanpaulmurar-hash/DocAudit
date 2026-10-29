@@ -5,7 +5,9 @@ Separat de extragere: `extract.com.ReadOnlyOneNote` rămâne doar citire.
 Operațiile permise sunt puține și reversibile:
 - create_section: secțiunea „Arhivă” într-un notebook, dacă lipsește;
 - create_page + update_page: copia paginii în Arhivă (sau înapoi, la restaurare);
-- update_page cu XML parțial: doar titlul (prefixul „[ÎNVECHIT]”);
+- update_page cu XML parțial: doar titlul (prefixul „[ÎNVECHIT]” sau titlul nou ales)
+  ori un singur bloc de text, cu paragrafele adăugate de utilizator;
+- delete_content: scoate la restaurare doar paragrafele adăugate de DocAudit (după objectID);
 - delete_page: trimite pagina în Coșul OneNote (recuperabilă din OneNote), nu definitiv.
 
 `FakeOneNote` imită aceleași operații într-un fișier JSON: îl folosesc testele
@@ -41,6 +43,8 @@ class WritableOneNote(Protocol):
     def update_page(self, xml: str) -> None: ...
 
     def delete_page(self, page_id: str) -> None: ...
+
+    def delete_content(self, page_id: str, object_id: str) -> None: ...
 
 
 class ComOneNote:  # pragma: no cover - doar pe Windows, cu OneNote desktop
@@ -85,6 +89,9 @@ class ComOneNote:  # pragma: no cover - doar pe Windows, cu OneNote desktop
     def delete_page(self, page_id: str) -> None:
         self._call.app.DeleteHierarchy(page_id, 0, False)  # False = în Coș, nu definitiv
 
+    def delete_content(self, page_id: str, object_id: str) -> None:
+        self._call.app.DeletePageContent(page_id, object_id, 0)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -111,7 +118,7 @@ class FakeOneNote:
             nb = fake._notebook(p.notebook, create=True)
             sec = fake._section(nb, "/".join(p.section_path), create=True)
             sec["pages"].append({"id": p.id, "name": p.title, "dateTime": p.created,
-                                 "lastModifiedTime": p.modified, "xml": render_page_xml(p, imgs),
+                                 "lastModifiedTime": p.modified, "xml": _with_object_ids(render_page_xml(p, imgs)),
                                  "recycled": False})
         fake.save()
         return fake
@@ -202,14 +209,22 @@ class FakeOneNote:
         self.calls.append("update_page")
         new = ET.fromstring(xml)
         _, _, page = self._find(new.get("ID", ""))
+        old = ET.fromstring(page["xml"])
         children = [c for c in new if c.tag != f"{ONE}Title"]
-        if children or ET.fromstring(page["xml"]).find(f"{ONE}Title") is None:
+        known = {el.get("objectID") for el in old if el.get("objectID")}
+        if children and all(c.get("objectID") in known for c in children):  # blocuri existente, ca OneNote
+            for c in children:
+                i, prev = next((i, el) for i, el in enumerate(old) if el.get("objectID") == c.get("objectID"))
+                old.remove(prev)
+                old.insert(i, c)
+            page["xml"] = ET.tostring(old, encoding="unicode")
+        elif children or old.find(f"{ONE}Title") is None:
             page["xml"] = xml  # conținut complet
         else:  # doar titlul
-            old = ET.fromstring(page["xml"])
             old.remove(old.find(f"{ONE}Title"))
             old.insert(0, new.find(f"{ONE}Title"))
             page["xml"] = ET.tostring(old, encoding="unicode")
+        page["xml"] = _with_object_ids(page["xml"])
         page["name"] = title_of(page["xml"])
         page["lastModifiedTime"] = _now()
         self.save()
@@ -219,4 +234,30 @@ class FakeOneNote:
         _, _, page = self._find(page_id)
         page["recycled"] = True
         self.save()
+
+    def delete_content(self, page_id: str, object_id: str) -> None:
+        self.calls.append("delete_content")
+        _, _, page = self._find(page_id)
+        root = ET.fromstring(page["xml"])
+        for parent in root.iter():
+            for child in list(parent):
+                if child.get("objectID") == object_id:
+                    parent.remove(child)
+                    page["xml"] = ET.tostring(root, encoding="unicode")
+                    page["lastModifiedTime"] = _now()
+                    self.save()
+                    return
+        raise OneNoteError(f"obiect inexistent: {object_id}")
+
+
+_OBJECT_TAGS = {f"{ONE}{t}" for t in ("Outline", "OE", "Image", "Table", "InsertedFile")}
+
+
+def _with_object_ids(xml: str) -> str:
+    """Ca OneNote: fiecare bloc, paragraf sau imagine primește un objectID dacă nu are."""
+    root = ET.fromstring(xml)
+    for el in root.iter():
+        if el.tag in _OBJECT_TAGS and not el.get("objectID"):
+            el.set("objectID", "{" + str(uuid.uuid4()).upper() + "}")
+    return ET.tostring(root, encoding="unicode")
 

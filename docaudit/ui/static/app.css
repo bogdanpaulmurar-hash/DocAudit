@@ -348,3 +348,7 @@ ul.plain li:hover { background: var(--panel-2); }
   .app, .groups { display: block; }
   .card { box-shadow: none; }
 }
+
+/* titlu nou / text adăugat, sub pagină */
+.edits { margin-top: 6px; padding: 6px 8px; border-left: 3px solid var(--accent); background: var(--panel-2); }
+.edit-text { white-space: pre-wrap; overflow-wrap: anywhere; }
