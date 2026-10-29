@@ -1,4 +1,4 @@
-"""Transformări pe XML-ul unei pagini OneNote, pentru arhivare, marcare și restaurare.
+"""Transformări pe XML-ul unei pagini OneNote, pentru arhivare, marcare, titlu nou, text adăugat și restaurare.
 
 Nu ating OneNote: primesc și întorc text XML. Le folosesc atât scriitorul COM,
 cât și OneNote-ul fals din teste.
@@ -6,6 +6,7 @@ cât și OneNote-ul fals din teste.
 
 from __future__ import annotations
 
+import copy
 import html
 import xml.etree.ElementTree as ET
 
@@ -102,3 +103,61 @@ def has_prefix(old_title_html: str, prefix: str) -> bool:
 def title_html_of(xml: str) -> str:
     """Conținutul brut (HTML) al primului one:T din titlu."""
     return title_update_xml(xml, "")[1]
+
+
+def plain_title_html(title: str) -> str:
+    """Titlul scris de utilizator, ca text (fără HTML) pentru one:T."""
+    return html.escape(" ".join(title.split()), quote=False)
+
+
+def add_text_xml(xml: str, text: str, at: str = "top") -> str:
+    """XML parțial care adaugă text în pagină: un paragraf pe rând, la începutul primului bloc
+    de text („top”) sau la sfârșitul ultimului („end”).
+
+    Blocul atins se trimite întreg, cu objectID-urile lui, ca OneNote să păstreze ce era;
+    paragrafele noi n-au objectID, deci OneNote le creează. Restul paginii nu se trimite.
+    """
+    root = _parse(xml)
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        raise ValueError("text gol")
+    page = ET.Element(f"{ONE}Page", {"ID": root.get("ID", "")})
+    outlines = root.findall(f"{ONE}Outline")
+    if outlines:
+        outline = copy.deepcopy(outlines[0] if at == "top" else outlines[-1])
+        for el in outline.iter():
+            el.attrib.pop("selected", None)
+    else:
+        outline = ET.Element(f"{ONE}Outline")
+    oec = outline.find(f"{ONE}OEChildren")
+    if oec is None:
+        oec = ET.SubElement(outline, f"{ONE}OEChildren")
+    new = []
+    for line in lines:
+        oe = ET.Element(f"{ONE}OE")
+        ET.SubElement(oe, f"{ONE}T").text = html.escape(line, quote=False)
+        new.append(oe)
+    if at == "top":
+        for i, oe in enumerate(new):
+            oec.insert(i, oe)
+    else:
+        oec.extend(new)
+    page.append(outline)
+    return _tostring(page)
+
+
+def object_ids(xml: str) -> set[str]:
+    return {el.get("objectID") for el in _parse(xml).iter() if el.get("objectID")}
+
+
+def added_paragraph_ids(before_xml: str, after_xml: str, text: str) -> list[str]:
+    """objectID-urile paragrafelor noi (cele care n-au existat înainte și au textul adăugat)."""
+    old = object_ids(before_xml)
+    wanted = {ln.strip() for ln in text.splitlines() if ln.strip()}
+    out = []
+    for oe in _parse(after_xml).iter(f"{ONE}OE"):
+        oid = oe.get("objectID")
+        t = oe.find(f"{ONE}T")
+        if oid and oid not in old and t is not None and inline_html(t.text or "")[0].strip() in wanted:
+            out.append(oid)
+    return out

@@ -522,6 +522,10 @@ async function renderGroup() {
         h("button", { class: p.decision === "move" ? "on" : "", title: "M", text: t("ui.action.move"),
                       onclick: () => movePicker(p, picker) }),
         btn("keep", "I"),
+        h("button", { class: p.rename && !p.rename.applied ? "on" : "", text: t("ui.action.rename") + "…",
+                      onclick: () => renameEditor(p, picker) }),
+        h("button", { class: p.added_texts.some(x => !x.applied) ? "on" : "", text: t("ui.action.add_text") + "…",
+                      onclick: () => addTextEditor(p, picker) }),
         h("button", { text: t("ui.action.not_in_group"), onclick: () => decide(p.id, "not_in_group") }),
         h("button", { text: t("ui.action.note"), onclick: () => {
           const note = prompt(t("ui.note.prompt"));
@@ -530,6 +534,7 @@ async function renderGroup() {
         p.decision_id ? h("button", { class: "ghost", text: t("ui.undo"), onclick: () => undo(p.decision_id) }) : null),
       picker,
       p.notes.length ? h("div", { class: "small muted" }, "📝 ", p.notes.join(" · ")) : null,
+      editsInfo(p),
       h("div", { class: "body" }, highlight(data.text, marks[p.id] || []),
         (data.images || []).map(img => h("img", { alt: img.alt || "", loading: "lazy",
           src: "/api/image" + q({ ds: S.ds, sha: img.sha256, t: TOKEN }) }))));
@@ -571,7 +576,8 @@ function highlight(text, marks) {
 
 // „Mută…”: alegi secțiunea din listă (citită din OneNote, doar citire); mutarea se face la „De aplicat”.
 async function movePicker(p, holder) {
-  if (holder.childElementCount) { holder.replaceChildren(); return; }
+  if (holder.dataset.open === "move") { holder.replaceChildren(); holder.dataset.open = ""; return; }
+  holder.dataset.open = "move";
   holder.replaceChildren(h("p", { class: "small muted", text: t("ui.move.loading") }));
   let r;
   try {
@@ -603,6 +609,50 @@ async function movePicker(p, holder) {
     h("div", { class: "row" }, ok, h("button", { class: "ghost", text: t("ui.move.cancel"),
       onclick: () => holder.replaceChildren() }))));
   filter.focus();
+}
+
+// Titlu nou / text adăugat: se scriu în OneNote doar la „De aplicat”, cu copie de siguranță înainte.
+function editsInfo(p) {
+  const rows = [];
+  const status = (x) => x.applied ? h("span", { class: "small muted", text: t("ui.status.applied") })
+    : h("button", { class: "ghost small", text: t("ui.undo"), onclick: () => undo(x.id) });
+  if (p.rename) rows.push(h("div", { class: "row small" },
+    h("span", { class: "grow", text: "✎ " + t("ui.rename.pending", { title: p.rename.title }) }), status(p.rename)));
+  for (const x of p.added_texts) rows.push(h("div", { class: "row small" },
+    h("span", { class: "grow edit-text", text: "＋ " + t("ui.addtext.pending." + x.at) + " " + x.text }), status(x)));
+  return rows.length ? h("div", { class: "stack edits" }, rows) : null;
+}
+
+function renameEditor(p, holder) {
+  if (holder.dataset.open === "rename") { holder.replaceChildren(); holder.dataset.open = ""; return; }
+  holder.dataset.open = "rename";
+  const input = h("input", { type: "text", value: p.rename && !p.rename.applied ? p.rename.title : p.title,
+                             maxlength: "300", class: "grow" });
+  const ok = h("button", { class: "primary", text: t("ui.rename.ok") });
+  ok.onclick = () => { const v = input.value.trim(); if (v && v !== p.title) decide(p.id, "rename", { target: v }); };
+  input.onkeydown = (e) => { if (e.key === "Enter") ok.click(); if (e.key === "Escape") holder.replaceChildren(); };
+  holder.replaceChildren(h("div", { class: "stack movebox" },
+    h("strong", { text: t("ui.rename.title") }), input,
+    h("p", { class: "small muted", text: t("ui.edit.help") }),
+    h("div", { class: "row" }, ok, h("button", { class: "ghost", text: t("ui.move.cancel"),
+      onclick: () => { holder.replaceChildren(); holder.dataset.open = ""; } }))));
+  input.focus();
+  input.select();
+}
+
+function addTextEditor(p, holder) {
+  if (holder.dataset.open === "add_text") { holder.replaceChildren(); holder.dataset.open = ""; return; }
+  holder.dataset.open = "add_text";
+  const text = h("textarea", { rows: "4", maxlength: "4000", placeholder: t("ui.addtext.placeholder") });
+  const at = h("select", {}, ["top", "end"].map(v => h("option", { value: v, text: t("ui.addtext.at." + v) })));
+  const ok = h("button", { class: "primary", text: t("ui.addtext.ok") });
+  ok.onclick = () => { const v = text.value.trim(); if (v) decide(p.id, "add_text", { target: at.value + "\t" + v }); };
+  holder.replaceChildren(h("div", { class: "stack movebox" },
+    h("strong", { text: t("ui.addtext.title") }), text, at,
+    h("p", { class: "small muted", text: t("ui.edit.help") }),
+    h("div", { class: "row" }, ok, h("button", { class: "ghost", text: t("ui.move.cancel"),
+      onclick: () => { holder.replaceChildren(); holder.dataset.open = ""; } }))));
+  text.focus();
 }
 
 function setFocus(i) {
@@ -676,7 +726,8 @@ async function viewApply() {
     const cb = h("input", { type: "checkbox", checked: it.status === "ready", disabled: it.status !== "ready" });
     checks[it.decision_id] = cb;
     const what = it.action === "archive" || it.action === "move" ? t("ui.apply.move", { from: it.section, to: it.target })
-                                         : t("ui.apply.rename", { title: it.target });
+      : it.action === "add_text" ? t("ui.apply.addtext", { text: it.target.length > 160 ? it.target.slice(0, 160) + "…" : it.target })
+      : t("ui.apply.rename", { title: it.target });
     return h("tr", {}, h("td", {}, cb), h("td", { text: it.title }), h("td", { text: `${it.notebook} › ${it.section}` }),
       h("td", { text: t("ui.action." + it.action) }), h("td", { text: what }),
       h("td", {}, it.status === "ready"
@@ -937,7 +988,8 @@ async function viewJournal() {
     h("tr", {}, ["ui.col.when", "ui.col.who", "ui.col.page", "ui.col.decision", "ui.col.note", "ui.col.status", ""].map(k => h("th", { text: k ? t(k) : "" }))),
     st.history.map(d => h("tr", { class: d.undone_at ? "muted" : "" },
       h("td", { text: fmtDate(d.created_at) }), h("td", { text: d.user }), h("td", { text: titles[d.page_id] || d.page_id }),
-      h("td", { text: t("ui.action." + d.action) }), h("td", { text: d.note }),
+      h("td", { text: t("ui.action." + d.action) }),
+      h("td", { class: "edit-text", text: d.note || (["rename", "add_text"].includes(d.action) ? d.target.replace(/^(top|end)\t/, "") : "") }),
       h("td", { text: d.applied_at ? t("ui.status.applied") : d.undone_at ? t("ui.status.undone") : t("ui.status.active") }),
       h("td", {}, !d.undone_at && !d.applied_at ? h("button", { class: "ghost", text: t("ui.undo"), onclick: () => undo(d.id) }) : null))))
     : h("p", { class: "muted", text: t("ui.journal.empty") });

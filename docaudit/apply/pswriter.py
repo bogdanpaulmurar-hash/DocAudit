@@ -4,7 +4,8 @@ De ce: pe laptopul de lucru OneNote cade la cererile făcute prin pywin32, iar p
 PowerShell merge. Scriptul face exact operațiile din `writer.ComOneNote`, nimic
 altceva: citirea ierarhiei și a paginii (pentru copia de siguranță), crearea unei
 secțiuni, a unei pagini, actualizarea unei pagini și trimiterea unei pagini în Coș
-(`DeleteHierarchy` cu deletePermanently = $false). Se folosește doar din `apply/`.
+(`DeleteHierarchy` cu deletePermanently = $false), plus scoaterea unui paragraf
+adăugat de DocAudit, la restaurare (`DeletePageContent`). Se folosește doar din `apply/`.
 
 Toți parametrii și rezultatele trec ca base64 (ASCII), un rând pe cerere.
 """
@@ -41,6 +42,7 @@ while ($true) {
       'NEWPAGE' { $on.CreateNewPage((Arg $p[1]), [ref]$x, 0); Ok $x }
       'UPDATE'  { $on.UpdatePageContent((Arg $p[1]), [DateTime]::MinValue, 2); Ok '' }
       'RECYCLE' { $on.DeleteHierarchy((Arg $p[1]), [DateTime]::MinValue, $false); Ok '' }
+      'DELOBJ'  { $on.DeletePageContent((Arg $p[1]), (Arg $p[2]), [DateTime]::MinValue); Ok '' }
       default   { [Console]::Out.WriteLine('ERR 0 comanda necunoscuta') }
     }
   } catch {
@@ -82,3 +84,6 @@ class PowerShellWriter(PowerShellProcess):
 
     def delete_page(self, page_id: str) -> None:
         self.request(f"RECYCLE\t{b64(page_id)}", "DeleteHierarchy")
+
+    def delete_content(self, page_id: str, object_id: str) -> None:
+        self.request(f"DELOBJ\t{b64(page_id)}\t{b64(object_id)}", "DeletePageContent")

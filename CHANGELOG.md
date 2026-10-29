@@ -1,5 +1,17 @@
 # CHANGELOG — DocAudit
 
+## 0.1.13 — 2026-10-29
+- Nou, în „Grupuri”, sub fiecare pagină: **„Titlu nou…”** (schimbi titlul paginii) și **„Adaugă text…”** (unul sau mai multe rânduri, la începutul sau la sfârșitul paginii). Se pot combina cu orice altă decizie (Referință, Învechită, Arhivează, Mută).
+  - ca restul deciziilor, nu schimbă nimic până la „De aplicat” → „Aplică” (cu scrierea pornită din Setări), cu copie de siguranță a paginii înainte; până atunci se pot anula;
+  - previzualizarea arată titlul nou și textul; pe aceeași pagină se aplică întâi titlul și textul, apoi „[ÎNVECHIT]” (pe titlul nou), la urmă mutarea;
+  - „Restaurează” pune titlul vechi înapoi, respectiv scoate doar paragrafele adăugate (după objectID, `DeletePageContent`); restul paginii nu e atins;
+  - textul adăugat e text simplu (fără formatare), un paragraf pe rând; se trimite în OneNote doar blocul de text atins, nu toată pagina.
+- O pagină schimbată de „Aplică” (titlu, text, „[ÎNVECHIT]”) nu mai e sărită ca „modificată după extragere” la o decizie ulterioară pe ea; o schimbare făcută de altcineva în OneNote se vede în continuare.
+- Textul din „De aplicat” și „Cum fac?” spune unde ajunge „Arhivează”: secțiunea „Arhivă” din același notebook, creată la „Aplică” dacă lipsește.
+- Jurnal: coloane noi `added_ids`, `after_modified` în `applied` (jurnalele vechi se completează singure).
+- Teste: 170 trecute (`pytest -q`, Linux); verificat în Chromium pe demo (editor, previzualizare).
+- Livrare: `git pull`, apoi `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.12 — 2026-10-29
 - Interfață nouă, doar aspectul (funcțiile, butoanele și tastele rapide sunt aceleași):
   - meniul e acum o bară în stânga, cu iconițe; extragerea, limba și tema stau jos în bară. Pe ecran îngust bara trece sus, doar cu iconițe;
