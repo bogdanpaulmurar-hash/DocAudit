@@ -95,7 +95,7 @@ function renderChrome() {
   document.querySelectorAll("[data-t]").forEach(el => { el.textContent = t(el.dataset.t); });
   const nav = document.getElementById("tabs");
   nav.replaceChildren(...TABS.map(tab => h("button", {
-    type: "button", "aria-current": S.tab === tab ? "page" : false, text: t("ui.tab." + tab),
+    type: "button", "data-tab": tab, "aria-current": S.tab === tab ? "page" : false, text: t("ui.tab." + tab),
     onclick: () => openTab(tab),
   })));
   const sel = document.getElementById("dataset");
