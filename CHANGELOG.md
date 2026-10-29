@@ -1,5 +1,19 @@
 # CHANGELOG — DocAudit
 
+## 0.1.12 — 2026-10-29
+- Interfață nouă, doar aspectul (funcțiile, butoanele și tastele rapide sunt aceleași):
+  - meniul e acum o bară în stânga, cu iconițe; extragerea, limba și tema stau jos în bară. Pe ecran îngust bara trece sus, doar cu iconițe;
+  - culori calme (fundal deschis cald, un singur accent indigo), carduri rotunjite, titluri mai mari, mai mult spațiu; tema întunecată refăcută pe aceleași culori;
+  - butoane fără chenar; butonul principal e închis la culoare; deciziile de sub fiecare pagină sunt o bară de opțiuni, cea aleasă apare colorată;
+  - „Grupuri”: filtrele sunt un comutator segmentat, grupul ales e evidențiat, grupurile rezolvate apar tăiate; constatările sunt blocuri separate, „Ignoră” apare la trecerea cu mouse-ul; textul paginii stă pe un fond ca de foaie, valorile diferite sunt subliniate cu roșu;
+  - „Cum fac?” e un buton mic; pașii apar numerotați în cerc;
+  - tabelele fără linii verticale, cu antet mic; „Setări” e un formular pe două coloane, cu comutatoare în loc de bife;
+  - arborele OneNote are săgeți și linii de ghidaj; bara de progres și mesajele de jos (toast) au formă nouă.
+- Tehnic: doar `ui/static/app.css` și `index.html`; în `app.js` butoanele din meniu primesc `data-tab` (pentru iconițe). Iconițele sunt SVG în CSS, fără fișiere sau resurse noi.
+- Reparat: banda „Scrierea în OneNote e pornită” nu mai poate apărea când scrierea e oprită (atributul `hidden` e respectat de CSS).
+- Teste: 163 trecute (`pytest -q`, Linux); verificat în Chromium pe toate ecranele, temă deschisă și întunecată, la 1440 / 1000 / 420 px.
+- Livrare: `git pull`, apoi `Install.bat`; închide întâi DocAudit din iconița de lângă ceas.
+
 ## 0.1.11 — 2026-10-28
 - „Export pentru bot” pregătește acum și ce îi trebuie botului, care nu are acces la OneNote:
   - **`00_Cuprins.pdf`**, încărcat în bot cu documentele: fiecare document, secțiunile și titlurile paginilor cu data ultimei modificări, plus ultimele schimbări (pagini noi, modificate, mutate dintr-un document în altul, scoase). Ține loc de memorie pentru bot. Un export fără noutăți nu-l schimbă, deci nu cere reîncărcare;
